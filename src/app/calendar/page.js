@@ -508,28 +508,28 @@ export default function CalendarPage() {
                           className={`mx-[2px] my-[3px] h-[36px] flex flex-col justify-center rounded-lg border px-2.5 shadow-md cursor-pointer transition-all z-10 hover:shadow-lg hover:scale-[1.01] group/booking relative ${getBookingColor(b.Status)}`}
                         >
                           {/* Rich Tooltip (CSS Hover) */}
-                          <div className="absolute hidden group-hover/booking:flex flex-col bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-neutral-900 border border-neutral-700 shadow-xl rounded-xl p-3 z-50 text-white pointer-events-none">
+                          <div className="absolute hidden group-hover/booking:flex flex-col bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-popover border border-border shadow-xl rounded-xl p-3 z-50 text-popover-foreground pointer-events-none">
                             <div className="font-bold text-sm mb-1">{b.CustomerName}</div>
-                            <div className="text-xs text-neutral-400 mb-2 flex items-center gap-1">📞 {b.CustomerPhone || 'Không có SĐT'}</div>
+                            <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">📞 {b.CustomerPhone || 'Không có SĐT'}</div>
                             
-                            <div className="grid grid-cols-2 gap-2 text-xs mb-2 bg-black/40 p-2 rounded-lg">
+                            <div className="grid grid-cols-2 gap-2 text-xs mb-2 bg-muted/60 p-2 rounded-lg">
                               <div>
-                                <div className="text-[9px] text-neutral-500 uppercase">IN</div>
-                                <div>{checkIn.getDate()}/{checkIn.getMonth() + 1}</div>
+                                <div className="text-[9px] text-muted-foreground uppercase">IN</div>
+                                <div className="text-foreground font-semibold">{checkIn.getDate()}/{checkIn.getMonth() + 1}</div>
                               </div>
                               <div>
-                                <div className="text-[9px] text-neutral-500 uppercase">OUT</div>
-                                <div>{checkOut.getDate()}/{checkOut.getMonth() + 1}</div>
+                                <div className="text-[9px] text-muted-foreground uppercase">OUT</div>
+                                <div className="text-foreground font-semibold">{checkOut.getDate()}/{checkOut.getMonth() + 1}</div>
                               </div>
                             </div>
 
                             <div className="flex justify-between items-center text-xs mt-1">
-                              <span className="text-neutral-400">Khách: {b.GuestCount || 1} 👥</span>
+                              <span className="text-muted-foreground">Khách: {b.GuestCount || 1} 👥</span>
                               <span className="font-bold text-primary">{Number(b.TotalPrice || 0).toLocaleString('vi-VN')}đ</span>
                             </div>
                             
                             {/* Triangle pointer */}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-neutral-900" />
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-border" />
                           </div>
 
                           <div className="text-[10px] font-bold truncate leading-tight flex items-center gap-1">
@@ -591,9 +591,9 @@ export default function CalendarPage() {
 
       {/* Choice Dialog */}
       <Dialog open={isChoiceOpen} onOpenChange={setIsChoiceOpen}>
-        <DialogContent className="bg-neutral-900 border-neutral-800 text-white p-6 max-w-[360px]">
+        <DialogContent className="bg-card border-border text-card-foreground p-6 max-w-[360px]">
           <DialogHeader>
-            <DialogTitle className="text-base text-white font-bold text-center">Lựa chọn thao tác</DialogTitle>
+            <DialogTitle className="text-base text-foreground font-bold text-center">Lựa chọn thao tác</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3 mt-4">
             <Button 
@@ -610,7 +610,7 @@ export default function CalendarPage() {
             </Button>
             <Button 
               variant="outline" 
-              className="border-neutral-800 hover:bg-neutral-800 text-white text-xs font-semibold h-10 w-full"
+              className="border-border hover:bg-muted text-foreground text-xs font-semibold h-10 w-full"
               onClick={() => {
                 setIsChoiceOpen(false);
                 setInitialRoomId(choiceRoomId);

@@ -1070,9 +1070,9 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
   const renderInvoiceTab = () => (
     <div className="space-y-6">
       {/* Printable Area Wrapper */}
-              <div id="invoice-print-area" className="p-6 bg-white text-black border border-neutral-300 rounded-xl space-y-6 max-w-[620px] mx-auto shadow-inner text-sm leading-relaxed">
+              <div id="invoice-print-area" className="p-6 bg-background text-foreground print:bg-white print:text-black border border-border print:border-neutral-300 rounded-xl space-y-6 max-w-[620px] mx-auto shadow-inner text-sm leading-relaxed">
                 {/* Header */}
-                <div className="flex justify-between items-start border-b border-neutral-200 pb-4">
+                <div className="flex justify-between items-start border-b border-border print:border-neutral-200 pb-4">
                   <div>
                     <h2 className="text-lg font-bold uppercase tracking-wide">{systemSettings?.HotelName || 'Smax Homestay'}</h2>
                     <p className="text-xs text-muted-foreground mt-1">Hóa đơn thanh toán / Invoice</p>
@@ -1088,22 +1088,22 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                   <div>
                     <p className="text-muted-foreground font-semibold">Thông tin khách hàng:</p>
                     <p className="font-bold text-sm mt-1">{customerName}</p>
-                    <p className="text-neutral-600 mt-0.5">SĐT: {customerPhone || '-'}</p>
+                    <p className="text-muted-foreground print:text-neutral-600 mt-0.5">SĐT: {customerPhone || '-'}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-muted-foreground font-semibold">Chi tiết đặt phòng:</p>
                     <p className="font-bold text-sm mt-1">Phòng: {rooms.find(r => String(r.Id) === String(roomId))?.RoomName || roomId}</p>
-                    <p className="text-neutral-600 mt-0.5">Check-in: {checkInDate}</p>
-                    <p className="text-neutral-600 mt-0.5">Check-out: {checkOutDate}</p>
+                    <p className="text-muted-foreground print:text-neutral-600 mt-0.5">Check-in: {checkInDate}</p>
+                    <p className="text-muted-foreground print:text-neutral-600 mt-0.5">Check-out: {checkOutDate}</p>
                   </div>
                 </div>
 
                 {/* Charges Breakdowns */}
                 <div className="space-y-2 mt-6">
-                  <p className="text-xs font-bold uppercase border-b border-neutral-200 pb-1 text-neutral-700">Chi tiết dịch vụ:</p>
+                  <p className="text-xs font-bold uppercase border-b border-border print:border-neutral-200 pb-1 text-foreground print:text-neutral-700">Chi tiết dịch vụ:</p>
                   <table className="w-full text-xs text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-neutral-200 font-semibold text-neutral-600">
+                      <tr className="border-b border-border print:border-neutral-200 font-semibold text-muted-foreground print:text-neutral-600">
                         <th className="py-1">Mục</th>
                         <th className="py-1 text-right">Đơn giá</th>
                         <th className="py-1 text-center">SL</th>
@@ -1112,7 +1112,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                     </thead>
                     <tbody>
                       {/* Room Charge */}
-                      <tr className="border-b border-neutral-100">
+                      <tr className="border-b border-border/50 print:border-neutral-100">
                         <td className="py-2">Tiền phòng (Thuê phòng Homestay)</td>
                         <td className="py-2 text-right">{roomCost.toLocaleString('vi-VN')}đ</td>
                         <td className="py-2 text-center">1</td>
@@ -1122,7 +1122,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                       {servicesOrdered.map((so) => {
                         const cat = servicesCatalog.find(s => String(s.Id) === String(so.ServiceId));
                         return (
-                          <tr key={so.Id} className="border-b border-neutral-100 text-neutral-700">
+                          <tr key={so.Id} className="border-b border-border/50 print:border-neutral-100 text-foreground print:text-neutral-700">
                             <td className="py-2 pl-4 italic">+ {cat?.ServiceName || `Dịch vụ #${so.ServiceId}`}</td>
                             <td className="py-2 text-right">{Number(so.UnitPrice).toLocaleString('vi-VN')}đ</td>
                             <td className="py-2 text-center">{so.Quantity}</td>
@@ -1136,10 +1136,10 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
 
                 {/* Payments Details */}
                 <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase border-b border-neutral-200 pb-1 text-neutral-700">Lịch sử thanh toán:</p>
+                  <p className="text-xs font-bold uppercase border-b border-border print:border-neutral-200 pb-1 text-foreground print:text-neutral-700">Lịch sử thanh toán:</p>
                   <table className="w-full text-xs text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-neutral-200 font-semibold text-neutral-600">
+                      <tr className="border-b border-border print:border-neutral-200 font-semibold text-muted-foreground print:text-neutral-600">
                         <th className="py-1">Giao dịch</th>
                         <th className="py-1">Phương thức</th>
                         <th className="py-1 text-right">Số tiền</th>
@@ -1154,7 +1154,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                         payments.map((p) => {
                           const date = new Date(p.PaymentDate).toLocaleDateString('vi-VN');
                           return (
-                            <tr key={p.Id} className="border-b border-neutral-100 text-neutral-700">
+                            <tr key={p.Id} className="border-b border-border/50 print:border-neutral-100 text-foreground print:text-neutral-700">
                               <td className="py-1.5">
                                 {p.PaymentType === 'Deposit' ? 'Đặt cọc' : p.PaymentType === 'Final Payment' ? 'Thanh toán nốt' : p.PaymentType === 'Refund' ? 'Hoàn tiền' : 'Phụ thu'} ({date})
                               </td>
@@ -1171,16 +1171,16 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                 </div>
 
                 {/* Totals Summary */}
-                <div className="border-t border-neutral-300 pt-4 flex flex-col items-end gap-1.5 text-xs text-right">
+                <div className="border-t border-border print:border-neutral-300 pt-4 flex flex-col items-end gap-1.5 text-xs text-right">
                   <div className="flex justify-between w-64">
                     <span className="text-muted-foreground">Tổng cộng (A):</span>
                     <span className="font-semibold">{totalCost.toLocaleString('vi-VN')}đ</span>
                   </div>
                   <div className="flex justify-between w-64">
                     <span className="text-muted-foreground">Khách đã trả (B):</span>
-                    <span className="font-semibold text-emerald-600">{totalPaid.toLocaleString('vi-VN')}đ</span>
+                    <span className="font-semibold text-emerald-500 print:text-emerald-600">{totalPaid.toLocaleString('vi-VN')}đ</span>
                   </div>
-                  <div className="flex justify-between w-64 border-t border-neutral-200 pt-1.5 text-sm font-bold">
+                  <div className="flex justify-between w-64 border-t border-border print:border-neutral-200 pt-1.5 text-sm font-bold">
                     <span>CẦN THANH TOÁN (A - B):</span>
                     <span className="text-rose-600">{remainingCost.toLocaleString('vi-VN')}đ</span>
                   </div>
@@ -1188,17 +1188,17 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
 
                 {/* VietQR Payment Block */}
                 {systemSettings?.BankName && systemSettings?.BankAccountNumber && remainingCost > 0 && (
-                  <div className="border border-neutral-200 rounded-lg p-3 flex items-center gap-4 bg-neutral-50">
+                  <div className="border border-border print:border-neutral-200 rounded-lg p-3 flex items-center gap-4 bg-muted/50 print:bg-neutral-50">
                     <img
                       src={`https://img.vietqr.io/image/${systemSettings.BankName}-${systemSettings.BankAccountNumber}-compact2.png?amount=${remainingCost}&addInfo=BS-${bookingId} ${customerName}&accountName=${encodeURIComponent(systemSettings.BankAccountName || '')}`}
                       alt="QR Thanh toán"
-                      className="h-28 w-28 object-contain"
+                      className="h-28 w-28 object-contain print:invert-0 dark:invert rounded"
                     />
                     <div className="text-xs space-y-1">
-                      <p className="font-bold text-sm text-neutral-800">Quét QR để thanh toán</p>
-                      <p className="text-muted-foreground">Ngân hàng: <span className="font-medium text-neutral-800 uppercase">{systemSettings.BankName}</span></p>
-                      <p className="text-muted-foreground">STK: <span className="font-medium text-neutral-800">{systemSettings.BankAccountNumber}</span></p>
-                      {systemSettings.BankAccountName && <p className="text-muted-foreground">Tên TK: <span className="font-medium text-neutral-800">{systemSettings.BankAccountName}</span></p>}
+                      <p className="font-bold text-sm text-foreground print:text-neutral-800">Quét QR để thanh toán</p>
+                      <p className="text-muted-foreground">Ngân hàng: <span className="font-medium text-foreground print:text-neutral-800 uppercase">{systemSettings.BankName}</span></p>
+                      <p className="text-muted-foreground">STK: <span className="font-medium text-foreground print:text-neutral-800">{systemSettings.BankAccountNumber}</span></p>
+                      {systemSettings.BankAccountName && <p className="text-muted-foreground">Tên TK: <span className="font-medium text-foreground print:text-neutral-800">{systemSettings.BankAccountName}</span></p>}
                       <p className="text-muted-foreground">Số tiền: <span className="font-bold text-rose-600">{remainingCost.toLocaleString('vi-VN')}đ</span></p>
                       <p className="text-muted-foreground italic">Nội dung: BS-{bookingId} {customerName}</p>
                     </div>
@@ -1364,7 +1364,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                                 setServicesOrdered(servicesOrdered.filter(s => s.Notes !== 'Tặng kèm Voucher'));
                               }} className="h-8 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-3">Hủy</Button>
                             ) : (
-                              <Button type="button" variant="secondary" size="sm" onClick={handleApplyPromo} className="h-8 text-xs bg-muted hover:bg-neutral-700 text-foreground px-3" disabled={!promoCode}>Áp dụng</Button>
+                              <Button type="button" variant="secondary" size="sm" onClick={handleApplyPromo} className="h-8 text-xs bg-muted hover:bg-muted-foreground/20 text-foreground px-3" disabled={!promoCode}>Áp dụng</Button>
                             )}
                           </div>
                           {!appliedPromo && promoCode && selectedPromoObj && (
