@@ -130,6 +130,7 @@ export async function POST(request) {
       Status: data.Status || 'Pending',
       Notes: data.Notes || 'Booking from External API',
       GuestCount: Number(data.GuestCount) || 1,
+      BookingSourceId: data.BookingSourceId ? Number(data.BookingSourceId) : null,
     };
 
     const res = await noco.createBooking(payload);
