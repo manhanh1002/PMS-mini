@@ -94,16 +94,18 @@ export async function POST(request) {
     }
 
     // Resolve room auto-allocation if RoomId is not provided
+    let room;
     if (!data.RoomId) {
       const findResult = await findAvailableRoom(noco, data.BranchId, data.RoomType, data.CheckInDate, data.CheckOutDate);
       if (findResult.error) {
         return NextResponse.json({ error: findResult.error }, { status: 409 });
       }
       data.RoomId = findResult.room.Id;
+      room = findResult.room;
     } else {
       // Validate provided RoomId
       const rooms = await noco.getRooms(data.BranchId); // Fixed query string bug
-      const room = rooms.find(r => String(r.Id) === String(data.RoomId));
+      room = rooms.find(r => String(r.Id) === String(data.RoomId));
       if (!room) {
         return NextResponse.json({ error: 'RoomId không tồn tại trong chi nhánh này' }, { status: 404 });
       }
@@ -113,6 +115,65 @@ export async function POST(request) {
     const availability = await checkRoomAvailability(noco, data.RoomId, data.CheckInDate, data.CheckOutDate);
     if (availability.conflict) {
       return NextResponse.json({ error: availability.message }, { status: 409 });
+    }
+
+    // Calculate default price if not provided
+    let finalTotalPrice = 0;
+    if (data.TotalPrice !== undefined && data.TotalPrice !== null && data.TotalPrice !== '') {
+      finalTotalPrice = Number(data.TotalPrice);
+    } else if (room) {
+      const bookingType = data.BookingType || 'Daily';
+      const checkInTime = data.CheckInTime || '14:00';
+      const checkOutTime = data.CheckOutTime || '12:00';
+      
+      if (bookingType === 'Hourly') {
+        const start = new Date(`${data.CheckInDate}T${checkInTime}`);
+        const end = new Date(`${data.CheckOutDate}T${checkOutTime}`);
+        const diffHours = Math.ceil((end - start) / (1000 * 60 * 60));
+        if (diffHours > 0) {
+          const baseHourly = Number(room.HourlyPrice || room.Price * 0.2);
+          const extraHourly = Number(room.ExtraHourPrice || room.Price * 0.05);
+          if (diffHours <= 2) {
+            finalTotalPrice = baseHourly;
+          } else {
+            finalTotalPrice = baseHourly + (diffHours - 2) * extraHourly;
+          }
+        }
+      } else if (bookingType === 'Overnight') {
+        const start = new Date(`${data.CheckInDate}T${data.CheckInTime || '22:00'}`);
+        const end = new Date(`${data.CheckOutDate}T${data.CheckOutTime || '10:00'}`);
+        const diffTime = end - start;
+        const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+        finalTotalPrice = nights * Number(room.OvernightPrice || room.Price * 0.7);
+      } else {
+        // Daily
+        const start = new Date(data.CheckInDate);
+        const end = new Date(data.CheckOutDate);
+        const diffTime = end - start;
+        const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+        
+        finalTotalPrice = nights * Number(room.Price || 0);
+        
+        const extraHourly = Number(room.ExtraHourPrice || room.Price * 0.05);
+        const inHour = parseInt(checkInTime.split(':')[0], 10);
+        if (inHour < 14) {
+          const earlyHours = 14 - inHour;
+          if (earlyHours <= 4) {
+            finalTotalPrice += earlyHours * extraHourly;
+          } else {
+            finalTotalPrice += Number(room.Price || 0);
+          }
+        }
+        const outHour = parseInt(checkOutTime.split(':')[0], 10);
+        if (outHour > 12) {
+          const lateHours = outHour - 12;
+          if (lateHours <= 4) {
+            finalTotalPrice += lateHours * extraHourly;
+          } else {
+            finalTotalPrice += Number(room.Price || 0);
+          }
+        }
+      }
     }
 
     // Prepare payload
@@ -126,7 +187,7 @@ export async function POST(request) {
       BookingType: data.BookingType || 'Daily',
       CheckInTime: data.CheckInTime || '14:00',
       CheckOutTime: data.CheckOutTime || '12:00',
-      TotalPrice: Number(data.TotalPrice) || 0,
+      TotalPrice: finalTotalPrice,
       Status: data.Status || 'Pending',
       Notes: data.Notes || 'Booking from External API',
       GuestCount: Number(data.GuestCount) || 1,
