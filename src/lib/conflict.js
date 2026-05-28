@@ -1,0 +1,48 @@
+/**
+ * conflict.js — Room availability conflict checker
+ *
+ * Logic: CONFLICT when newIn < existingOut AND newOut > existingIn  (open interval)
+ * Same-day checkout/checkin is ALLOWED: A out 28/5, B in 28/5 → OK
+ * Extend block: A cannot extend checkout if it overlaps B's checkin range → CONFLICT
+ */
+
+/**
+ * Check if a date range conflicts with existing bookings or room blocks for a room.
+ *
+ * @param {object} noco - nocodb instance
+ * @param {number|string} roomId
+ * @param {string} newIn  - "YYYY-MM-DD"
+ * @param {string} newOut - "YYYY-MM-DD"
+ * @param {number|string|null} excludeBookingId - exclude this booking ID when editing (avoid false positive)
+ * @returns {Promise<{ conflict: boolean, message?: string }>}
+ */
+export async function checkRoomAvailability(noco, roomId, newIn, newOut, excludeBookingId = null) {
+  const [bookings, blocks] = await Promise.all([
+    noco.getBookingsByRoom(roomId),
+    noco.getRoomBlocksByRoom(roomId),
+  ]);
+
+  // Check against existing bookings
+  for (const b of bookings) {
+    if (excludeBookingId && String(b.Id) === String(excludeBookingId)) continue;
+    // Open interval: conflict only if newIn < existingOut AND newOut > existingIn
+    if (newIn < b.CheckOutDate && newOut > b.CheckInDate) {
+      return {
+        conflict: true,
+        message: `Phòng đã có đặt phòng từ ${b.CheckInDate} đến ${b.CheckOutDate} (Khách: ${b.CustomerName}). Vui lòng chọn ngày khác.`,
+      };
+    }
+  }
+
+  // Check against room blocks (maintenance, owner-use, etc.)
+  for (const bl of blocks) {
+    if (newIn < bl.EndDate && newOut > bl.StartDate) {
+      return {
+        conflict: true,
+        message: `Phòng đang bị khóa/bảo trì từ ${bl.StartDate} đến ${bl.EndDate}. Không thể đặt phòng trong khoảng này.`,
+      };
+    }
+  }
+
+  return { conflict: false };
+}

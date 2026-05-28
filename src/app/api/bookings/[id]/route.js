@@ -1,6 +1,8 @@
 import { noco } from '@/lib/nocodb';
 import { verifyJWT } from '@/lib/auth';
 import { NextResponse } from 'next/server';
+import { checkRoomAvailability } from '@/lib/conflict';
+
 
 async function getSessionUser(request) {
   const cookie = request.cookies.get('pms_session');
@@ -78,6 +80,19 @@ export async function PATCH(request, { params }) {
     // Staff access check
     if (user.role !== 'Admin' && currentBooking.BranchId !== user.branchId) {
       return NextResponse.json({ error: 'Bạn không được phép chỉnh sửa đặt phòng của chi nhánh khác.' }, { status: 403 });
+    }
+
+    // Conflict check when dates or room change (exclude self to avoid false positive)
+    const needsCheck = data.CheckInDate || data.CheckOutDate || data.RoomId;
+    if (needsCheck) {
+      const checkIn  = data.CheckInDate  || currentBooking.CheckInDate;
+      const checkOut = data.CheckOutDate || currentBooking.CheckOutDate;
+      const roomId   = data.RoomId       || currentBooking.RoomId;
+
+      const availability = await checkRoomAvailability(noco, roomId, checkIn, checkOut, id);
+      if (availability.conflict) {
+        return NextResponse.json({ error: availability.message }, { status: 409 });
+      }
     }
 
     const res = await noco.updateBooking(id, data);

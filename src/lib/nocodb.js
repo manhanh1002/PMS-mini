@@ -118,6 +118,18 @@ export const noco = {
       body: JSON.stringify(data),
     });
   },
+  // Fetch only active bookings for a specific room (excludes Cancelled & NoShow)
+  async getBookingsByRoom(roomId) {
+    try {
+      const res = await nocoRequest(
+        `${TABLES.bookings}?where=(RoomId,eq,${roomId})~and(Status,ne,Cancelled)~and(Status,ne,NoShow)&limit=500`
+      );
+      return res.list || res || [];
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  },
 
   // Users / Authentication
   async getUser(username) {
@@ -308,6 +320,16 @@ export const noco = {
   async getRoomBlocks() {
     try {
       const res = await nocoRequest(`${TABLES.roomBlocks}`);
+      return res.list || res || [];
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  },
+  // Fetch room blocks for a specific room only
+  async getRoomBlocksByRoom(roomId) {
+    try {
+      const res = await nocoRequest(`${TABLES.roomBlocks}?where=(RoomId,eq,${roomId})&limit=200`);
       return res.list || res || [];
     } catch (e) {
       console.error(e);

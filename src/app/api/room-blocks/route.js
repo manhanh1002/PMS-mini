@@ -1,6 +1,8 @@
 import { noco } from '@/lib/nocodb';
 import { verifyJWT } from '@/lib/auth';
 import { NextResponse } from 'next/server';
+import { checkRoomAvailability } from '@/lib/conflict';
+
 
 async function getSessionUser(request) {
   const cookie = request.cookies.get('pms_session');
@@ -33,6 +35,18 @@ export async function POST(request) {
     const data = await request.json();
     if (!data.RoomId || !data.StartDate || !data.EndDate) {
       return NextResponse.json({ error: 'Thiếu thông tin bắt buộc (RoomId, StartDate, EndDate).' }, { status: 400 });
+    }
+
+    // Past-date check
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (data.StartDate < todayStr) {
+      return NextResponse.json({ error: 'Không thể khóa phòng với ngày trong quá khứ.' }, { status: 400 });
+    }
+
+    // Overlap / conflict check
+    const availability = await checkRoomAvailability(noco, data.RoomId, data.StartDate, data.EndDate);
+    if (availability.conflict) {
+      return NextResponse.json({ error: availability.message }, { status: 409 });
     }
 
     const res = await noco.createRoomBlock(data);

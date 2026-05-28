@@ -1,6 +1,7 @@
 import { noco } from '@/lib/nocodb';
 import { verifyJWT } from '@/lib/auth';
 import { NextResponse } from 'next/server';
+import { checkRoomAvailability } from '@/lib/conflict';
 
 async function getSessionUser(request) {
   const cookie = request.cookies.get('pms_session');
@@ -39,8 +40,8 @@ export async function POST(request) {
     }
 
     const data = await request.json();
-    
-    // Validations
+
+    // Validate required fields
     if (!data.RoomId || !data.BranchId || !data.CustomerName || !data.CheckInDate || !data.CheckOutDate) {
       return NextResponse.json({ error: 'Thiếu thông tin đặt phòng bắt buộc.' }, { status: 400 });
     }
@@ -50,8 +51,20 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Bạn không được phép đặt phòng ở chi nhánh khác.' }, { status: 403 });
     }
 
+    // Past-date check (only for new bookings)
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (data.CheckInDate < todayStr) {
+      return NextResponse.json({ error: 'Không thể đặt phòng với ngày check-in trong quá khứ.' }, { status: 400 });
+    }
+
+    // Overlap / conflict check
+    const availability = await checkRoomAvailability(noco, data.RoomId, data.CheckInDate, data.CheckOutDate);
+    if (availability.conflict) {
+      return NextResponse.json({ error: availability.message }, { status: 409 });
+    }
+
     const res = await noco.createBooking(data);
-    
+
     // If a promo code was applied, increment its UsedCount
     if (data.PromoCode) {
       const promo = await noco.getPromotionByCode(data.PromoCode);
@@ -60,8 +73,7 @@ export async function POST(request) {
       }
     }
 
-    // Optionally update room status to Occupied if check-in is today
-    const todayStr = new Date().toISOString().split('T')[0];
+    // Update room status to Occupied if check-in is today
     if (data.Status === 'CheckedIn' || (data.CheckInDate === todayStr && data.Status === 'Confirmed')) {
       await noco.updateRoom(data.RoomId, { Status: 'Occupied' });
     }

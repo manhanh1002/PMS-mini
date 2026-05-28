@@ -11,9 +11,11 @@ import { toast } from 'sonner';
 
 export default function BlockModal({ isOpen, onClose, initialRoomId, initialDate, onSave }) {
   const { selectedBranch, user } = useBranch();
+  const todayStr = new Date().toISOString().split('T')[0];
   
   // Data states
   const [rooms, setRooms] = useState([]);
+  const [busyRanges, setBusyRanges] = useState([]);
   
   // Form states
   const [roomId, setRoomId] = useState('');
@@ -22,6 +24,11 @@ export default function BlockModal({ isOpen, onClose, initialRoomId, initialDate
   const [blockType, setBlockType] = useState('Maintenance');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Detect client-side conflict
+  const hasConflict = busyRanges.some(
+    (r) => startDate < r.to && endDate > r.from
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -39,8 +46,18 @@ export default function BlockModal({ isOpen, onClose, initialRoomId, initialDate
       setEndDate(initialDate || '');
       setBlockType('Maintenance');
       setNotes('');
+      setBusyRanges([]);
     }
   }, [isOpen, initialRoomId, initialDate, selectedBranch, user]);
+
+  // Fetch busy ranges when roomId changes
+  useEffect(() => {
+    if (!roomId) { setBusyRanges([]); return; }
+    fetch(`/api/bookings/availability?roomId=${roomId}`)
+      .then(res => res.json())
+      .then(data => { if (data.busy) setBusyRanges(data.busy); })
+      .catch(() => setBusyRanges([]));
+  }, [roomId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -132,6 +149,7 @@ export default function BlockModal({ isOpen, onClose, initialRoomId, initialDate
                 <Input
                   type="date"
                   value={startDate}
+                  min={todayStr}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="pl-10 bg-background border-border text-foreground text-xs"
                   required
@@ -147,6 +165,7 @@ export default function BlockModal({ isOpen, onClose, initialRoomId, initialDate
                 <Input
                   type="date"
                   value={endDate}
+                  min={startDate || todayStr}
                   onChange={(e) => setEndDate(e.target.value)}
                   className="pl-10 bg-background border-border text-foreground text-xs"
                   required
@@ -155,6 +174,26 @@ export default function BlockModal({ isOpen, onClose, initialRoomId, initialDate
               </div>
             </div>
           </div>
+
+          {/* Busy ranges banner */}
+          {busyRanges.length > 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400 space-y-1">
+              <p className="font-semibold">⚠️ Phòng này đã có lịch trong các khoảng sau:</p>
+              {busyRanges.map((r, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="font-mono">{r.from} → {r.to}</span>
+                  <span className="text-muted-foreground">— {r.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Conflict warning */}
+          {hasConflict && startDate && endDate && (
+            <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-500 font-semibold">
+              ❌ Khoảng thời gian đã bị trùng với lịch hiện có. Vui lòng chọn ngày khác.
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground font-semibold">Ghi chú lý do chi tiết</label>
@@ -174,7 +213,7 @@ export default function BlockModal({ isOpen, onClose, initialRoomId, initialDate
             <Button type="button" variant="outline" onClick={onClose} className="border-border text-foreground hover:bg-muted text-xs">
               Hủy
             </Button>
-            <Button type="submit" className="bg-rose-600 hover:bg-rose-700 text-foreground text-xs" disabled={isSubmitting}>
+            <Button type="submit" className="bg-rose-600 hover:bg-rose-700 text-foreground text-xs" disabled={isSubmitting || hasConflict}>
               {isSubmitting ? 'Đang thực hiện...' : 'Khóa phòng'}
             </Button>
           </div>

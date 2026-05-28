@@ -62,6 +62,14 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('services');
 
+  // Busy ranges state for conflict prevention
+  const [busyRanges, setBusyRanges] = useState([]);
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const hasConflict = (status !== 'Cancelled' && status !== 'NoShow') && busyRanges.some(
+    (r) => checkInDate < r.to && checkOutDate > r.from
+  );
+
   // Load Rooms & Services Catalog
   useEffect(() => {
     if (isOpen) {
@@ -118,12 +126,28 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
         setServicesOrdered([]);
         setPayments([]);
         setActiveTab('general');
+        setBusyRanges([]);
       } else {
         // Load existing booking
         loadBookingDetails(bookingId);
       }
     }
   }, [isOpen, bookingId, initialRoomId, initialDate, selectedBranch, user]);
+
+  // Fetch busy ranges when roomId or bookingId changes
+  useEffect(() => {
+    if (!roomId) {
+      setBusyRanges([]);
+      return;
+    }
+    const excludeParam = bookingId ? `&excludeId=${bookingId}` : '';
+    fetch(`/api/bookings/availability?roomId=${roomId}${excludeParam}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.busy) setBusyRanges(data.busy);
+      })
+      .catch(() => setBusyRanges([]));
+  }, [roomId, bookingId]);
 
   // Compute roomCharge automatically when nights / hours / room changes
   useEffect(() => {
@@ -292,6 +316,16 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
     e.preventDefault();
     if (!roomId || !customerName || !checkInDate || !checkOutDate) {
       toast.error('Vui lòng điền đầy đủ các thông tin bắt buộc.');
+      return;
+    }
+
+    if (new Date(checkInDate) > new Date(checkOutDate)) {
+      toast.error('Ngày nhận phòng không thể lớn hơn ngày trả phòng.');
+      return;
+    }
+
+    if (hasConflict) {
+      toast.error('Khoảng thời gian đặt phòng bị trùng lặp với lịch hiện có. Vui lòng chọn ngày khác.');
       return;
     }
 
@@ -688,6 +722,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                         <Input
                           type="date"
                           value={checkInDate}
+                          min={!bookingId ? todayStr : undefined}
                           onChange={(e) => setCheckInDate(e.target.value)}
                           className="pl-9 bg-background border-border text-foreground text-xs sm:text-sm"
                           required
@@ -713,6 +748,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                         <Input
                           type="date"
                           value={checkOutDate}
+                          min={checkInDate || (!bookingId ? todayStr : undefined)}
                           onChange={(e) => setCheckOutDate(e.target.value)}
                           className="pl-9 bg-background border-border text-foreground text-xs sm:text-sm"
                           required
@@ -729,6 +765,28 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                       />
                     </div>
                   </div>
+
+                  {/* Busy ranges banner & Conflict warning */}
+                  {roomId && (busyRanges.length > 0 || (hasConflict && checkInDate && checkOutDate)) && (
+                    <div className="sm:col-span-2 space-y-2">
+                      {busyRanges.length > 0 && (
+                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400 space-y-1">
+                          <p className="font-semibold">⚠️ Phòng này đã có lịch trong các khoảng sau:</p>
+                          {busyRanges.map((r, i) => (
+                            <div key={i} className="flex items-center gap-1.5">
+                              <span className="font-mono">{r.from} → {r.to}</span>
+                              <span className="text-muted-foreground">— {r.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {hasConflict && checkInDate && checkOutDate && (
+                        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-500 font-semibold">
+                          ❌ Khoảng thời gian đã bị trùng với lịch hiện có. Vui lòng chọn ngày khác.
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <label className="text-xs text-muted-foreground font-semibold">Trạng thái đặt phòng *</label>
@@ -1437,7 +1495,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                   </div>
                 <div className="flex justify-end gap-3 mt-4">
                   <Button type="button" variant="outline" onClick={onClose} className="border-border hover:bg-muted text-foreground">Hủy</Button>
-                  <Button type="submit" form="booking-form" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>{isSubmitting ? "Đang lưu..." : "Lưu lại"}</Button>
+                  <Button type="submit" form="booking-form" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting || hasConflict}>{isSubmitting ? "Đang lưu..." : "Lưu lại"}</Button>
                 </div>
               </div>
           </div>

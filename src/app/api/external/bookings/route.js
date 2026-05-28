@@ -1,5 +1,7 @@
 import { noco } from '@/lib/nocodb';
 import { NextResponse } from 'next/server';
+import { checkRoomAvailability } from '@/lib/conflict';
+
 
 // Helper to authenticate via x-api-key
 async function authenticate(request) {
@@ -96,6 +98,12 @@ export async function POST(request) {
     const room = rooms.find(r => String(r.Id) === String(data.RoomId));
     if (!room) {
       return NextResponse.json({ error: 'RoomId không tồn tại trong chi nhánh này' }, { status: 404 });
+    }
+
+    // Overlap / conflict check (no past-date enforcement for OTA external bookings)
+    const availability = await checkRoomAvailability(noco, data.RoomId, data.CheckInDate, data.CheckOutDate);
+    if (availability.conflict) {
+      return NextResponse.json({ error: availability.message }, { status: 409 });
     }
 
     // Prepare payload
