@@ -283,7 +283,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
       const svcs = data.servicesOrdered || [];
       setServicesOrdered(svcs);
       const svcTotal = svcs.reduce((sum, item) => sum + (Number(item.UnitPrice) * Number(item.Quantity)), 0);
-      const loadedCharge = Number(data.TotalPrice || 0) - svcTotal;
+      const loadedCharge = Number(data.TotalPrice || 0) - svcTotal + Number(data.DiscountAmount || 0);
       setRoomCharge(loadedCharge);
       loadedInitialChargeRef.current = loadedCharge; // Store to compare against auto charge
       setIsCustomPrice(false); // Default to off, let useEffect turn it on if it mismatches auto charge
@@ -296,13 +296,12 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
       setCheckOutTime(data.CheckOutTime || '12:00');
       setGuestCount(data.GuestCount ? Number(data.GuestCount) : 1);
       setPromoCode(data.PromoCode || '');
-      if (data.PromoCode && data.DiscountAmount) {
+      if (data.PromoCode) {
         setAppliedPromo({ Code: data.PromoCode }); // Dummy for UI display
-        setDiscountAmount(Number(data.DiscountAmount));
       } else {
         setAppliedPromo(null);
-        setDiscountAmount(0);
       }
+      setDiscountAmount(Number(data.DiscountAmount || 0));
       setPayments(data.payments || []);
     } catch (e) {
       toast.error('Lỗi khi tải chi tiết đơn đặt phòng: ' + e.message);
