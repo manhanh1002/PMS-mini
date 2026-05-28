@@ -122,7 +122,7 @@ export const noco = {
   async getBookingsByRoom(roomId) {
     try {
       const res = await nocoRequest(
-        `${TABLES.bookings}?where=(RoomId,eq,${roomId})~and(Status,ne,Cancelled)~and(Status,ne,NoShow)&limit=500`
+        `${TABLES.bookings}?where=(RoomId,eq,${roomId})~and(Status,neq,Cancelled)~and(Status,neq,NoShow)&limit=500`
       );
       return res.list || res || [];
     } catch (e) {

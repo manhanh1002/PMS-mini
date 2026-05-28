@@ -1,6 +1,6 @@
 import { noco } from '@/lib/nocodb';
 import { NextResponse } from 'next/server';
-import { checkRoomAvailability } from '@/lib/conflict';
+import { checkRoomAvailability, findAvailableRoom } from '@/lib/conflict';
 
 
 // Helper to authenticate via x-api-key
@@ -83,21 +83,30 @@ export async function POST(request) {
     }
 
     // Validations
-    if (!data.RoomId || !data.BranchId || !data.CustomerName || !data.CheckInDate || !data.CheckOutDate) {
-      return NextResponse.json({ error: 'Thiếu thông tin đặt phòng bắt buộc (RoomId, BranchId, CustomerName, CheckInDate, CheckOutDate)' }, { status: 400 });
+    if ((!data.RoomId && !data.RoomType) || !data.BranchId || !data.CustomerName || !data.CheckInDate || !data.CheckOutDate) {
+      return NextResponse.json({ error: 'Thiếu thông tin đặt phòng bắt buộc (RoomId hoặc RoomType, BranchId, CustomerName, CheckInDate, CheckOutDate)' }, { status: 400 });
     }
 
-    // Check if branch and room exist
+    // Check if branch exists
     const branches = await noco.getBranches();
-    const rooms = await noco.getRooms(`?branchId=${data.BranchId}`);
-    
     if (!branches.find(b => String(b.Id) === String(data.BranchId))) {
       return NextResponse.json({ error: 'BranchId không tồn tại' }, { status: 404 });
     }
-    
-    const room = rooms.find(r => String(r.Id) === String(data.RoomId));
-    if (!room) {
-      return NextResponse.json({ error: 'RoomId không tồn tại trong chi nhánh này' }, { status: 404 });
+
+    // Resolve room auto-allocation if RoomId is not provided
+    if (!data.RoomId) {
+      const findResult = await findAvailableRoom(noco, data.BranchId, data.RoomType, data.CheckInDate, data.CheckOutDate);
+      if (findResult.error) {
+        return NextResponse.json({ error: findResult.error }, { status: 409 });
+      }
+      data.RoomId = findResult.room.Id;
+    } else {
+      // Validate provided RoomId
+      const rooms = await noco.getRooms(data.BranchId); // Fixed query string bug
+      const room = rooms.find(r => String(r.Id) === String(data.RoomId));
+      if (!room) {
+        return NextResponse.json({ error: 'RoomId không tồn tại trong chi nhánh này' }, { status: 404 });
+      }
     }
 
     // Overlap / conflict check (no past-date enforcement for OTA external bookings)

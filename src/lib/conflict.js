@@ -46,3 +46,42 @@ export async function checkRoomAvailability(noco, roomId, newIn, newOut, exclude
 
   return { conflict: false };
 }
+
+/**
+ * Find a random available room of a specific RoomType in a branch for given dates.
+ *
+ * @param {object} noco - nocodb instance
+ * @param {number|string} branchId
+ * @param {string} roomType
+ * @param {string} checkInDate - "YYYY-MM-DD"
+ * @param {string} checkOutDate - "YYYY-MM-DD"
+ * @returns {Promise<{ room?: object, error?: string }>}
+ */
+export async function findAvailableRoom(noco, branchId, roomType, checkInDate, checkOutDate) {
+  const rooms = await noco.getRooms(branchId);
+  
+  // Filter rooms matching the requested RoomType and not in permanent maintenance
+  const matchingRooms = rooms.filter(
+    (r) =>
+      r.RoomType &&
+      r.RoomType.toLowerCase() === roomType.toLowerCase() &&
+      r.Status !== 'Maintenance'
+  );
+
+  if (matchingRooms.length === 0) {
+    return { error: `Không tìm thấy phòng nào thuộc loại "${roomType}" ở chi nhánh này.` };
+  }
+
+  // Shuffle rooms for random selection
+  const shuffledRooms = [...matchingRooms].sort(() => Math.random() - 0.5);
+
+  for (const room of shuffledRooms) {
+    const availability = await checkRoomAvailability(noco, room.Id, checkInDate, checkOutDate);
+    if (!availability.conflict) {
+      return { room };
+    }
+  }
+
+  return { error: `Hết phòng trống thuộc loại "${roomType}" trong khoảng thời gian từ ${checkInDate} đến ${checkOutDate}.` };
+}
+
