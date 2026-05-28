@@ -45,7 +45,7 @@ export default function RootLayout({ children }) {
           } catch (e) {}
         `}} />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <ThemeProvider>
           <MainLayout>{children}</MainLayout>
         </ThemeProvider>
