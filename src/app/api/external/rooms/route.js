@@ -28,12 +28,23 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const branchId = searchParams.get('branchId');
 
-    const rooms = await noco.getRooms(branchId || null);
+    // Query rooms and branches in parallel
+    const [rooms, branches] = await Promise.all([
+      noco.getRooms(branchId || null),
+      noco.getBranches()
+    ]);
+
+    // Create a map of BranchId -> BranchName
+    const branchMap = {};
+    branches.forEach((b) => {
+      branchMap[b.Id] = b.BranchName;
+    });
 
     // Return a cleaned up version of the rooms for external use
     const cleanRooms = rooms.map((r) => ({
       Id: r.Id,
       BranchId: r.BranchId,
+      BranchName: branchMap[r.BranchId] || '',
       RoomName: r.RoomName,
       RoomType: r.RoomType,
       Price: r.Price,
@@ -43,7 +54,7 @@ export async function GET(request) {
       MaxGuests: r.MaxGuests,
       Status: r.Status,
       CleanStatus: r.CleanStatus,
-      Description: r.Description,
+      Description: r.Notes || r.Description || '',
     }));
 
     return NextResponse.json(cleanRooms);
