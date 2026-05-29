@@ -21,7 +21,6 @@ const SETTING_TABS = [
   { id: 'branding', label: 'Thương hiệu', icon: Palette },
   { id: 'hotel', label: 'Thông tin khách sạn', icon: Hotel },
   { id: 'billing', label: 'Thanh toán & QR', icon: QrCode },
-  { id: 'policies', label: 'Chính sách vận hành', icon: ClockAlert },
   { id: 'room_types', label: 'Loại phòng', icon: DoorOpen },
   { id: 'api_gateway', label: 'Cổng API', icon: Webhook },
   { id: 'templates', label: 'Mẫu tin nhắn', icon: MessageSquareText },
@@ -203,87 +202,6 @@ function BillingTab({ settings, onChange }) {
   );
 }
 
-// ─── Operational policies tab ─────────────────────────────────────────────────
-function PoliciesTab({ settings, onChange }) {
-  return (
-    <FieldGroup>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Giờ check-in mặc định" hint="Giờ vào phòng tiêu chuẩn">
-          <div className="relative">
-            <AlarmClock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="setting-DefaultCheckInTime"
-              type="time"
-              className="pl-9"
-              value={settings.DefaultCheckInTime || '14:00'}
-              onChange={(e) => onChange('DefaultCheckInTime', e.target.value)}
-            />
-          </div>
-        </Field>
-        <Field label="Giờ check-out mặc định" hint="Giờ trả phòng tiêu chuẩn">
-          <div className="relative">
-            <AlarmClock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="setting-DefaultCheckOutTime"
-              type="time"
-              className="pl-9"
-              value={settings.DefaultCheckOutTime || '12:00'}
-              onChange={(e) => onChange('DefaultCheckOutTime', e.target.value)}
-            />
-          </div>
-        </Field>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Phụ thu nhận phòng sớm (VNĐ)" hint="0 = không tính phụ thu">
-          <Input
-            id="setting-SurchargeEarlyCheckIn"
-            type="number"
-            min={0}
-            value={settings.SurchargeEarlyCheckIn || '0'}
-            onChange={(e) => onChange('SurchargeEarlyCheckIn', e.target.value)}
-            placeholder="0"
-          />
-        </Field>
-        <Field label="Phụ thu trả phòng muộn (VNĐ)" hint="0 = không tính phụ thu">
-          <Input
-            id="setting-SurchargeLateCheckOut"
-            type="number"
-            min={0}
-            value={settings.SurchargeLateCheckOut || '0'}
-            onChange={(e) => onChange('SurchargeLateCheckOut', e.target.value)}
-            placeholder="0"
-          />
-        </Field>
-      </div>
-
-      <Field label="Tự động chuyển phòng sang &quot;Cần dọn dẹp&quot; sau check-out">
-        <div className="flex items-center gap-3">
-          <button
-            id="setting-AutoCleanOnCheckOut"
-            type="button"
-            role="switch"
-            aria-checked={settings.AutoCleanOnCheckOut === 'true'}
-            onClick={() => onChange('AutoCleanOnCheckOut', settings.AutoCleanOnCheckOut === 'true' ? 'false' : 'true')}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-              settings.AutoCleanOnCheckOut === 'true' ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                settings.AutoCleanOnCheckOut === 'true' ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-          <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-            <BrushCleaning className="h-4 w-4" />
-            {settings.AutoCleanOnCheckOut === 'true' ? 'Bật — tự động đổi trạng thái' : 'Tắt — giữ nguyên trạng thái'}
-          </span>
-        </div>
-      </Field>
-    </FieldGroup>
-  );
-}
 
 // ─── Message templates tab ────────────────────────────────────────────────────
 const TEMPLATE_VARS = '{GuestName} {HotelName} {RoomName} {CheckInDate} {CheckOutDate} {TotalAmount} {PaidAmount} {RemainingAmount} {BookingId} {BankAccountNumber} {BankName}';
@@ -842,7 +760,7 @@ export default function SettingsPage() {
                 {activeTab === 'branding' && <BrandingTab settings={settings} onChange={handleChange} />}
                 {activeTab === 'hotel' && <HotelTab settings={settings} onChange={handleChange} />}
                 {activeTab === 'billing' && <BillingTab settings={settings} onChange={handleChange} />}
-                {activeTab === 'policies' && <PoliciesTab settings={settings} onChange={handleChange} />}
+
                 {activeTab === 'room_types' && <RoomTypesTab settings={settings} onChange={handleChange} />}
                 {activeTab === 'api_gateway' && <ApiGatewayTab settings={settings} onChange={handleChange} />}
                 {activeTab === 'templates' && <TemplatesTab settings={settings} onChange={handleChange} />}

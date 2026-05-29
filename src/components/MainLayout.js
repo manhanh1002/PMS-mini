@@ -9,7 +9,7 @@ import {
   Hotel, LayoutDashboard, Calendar, FileSpreadsheet, DoorOpen,
   BadgePlus, GitBranch, LogOut, Loader2, User, Globe, Wallet,
   Settings, UsersRound, ChevronLeft, ChevronRight, Tag,
-  Sun, Moon, Monitor
+  Sun, Moon, Monitor, ClockAlert
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -50,12 +50,13 @@ function LayoutContent({ children }) {
     { name: 'Sổ quỹ Thu Chi', path: '/cashbook', icon: Wallet },
   ];
 
-  // Only Admin can manage branches, sources, users & settings
+  // Only Admin can manage branches, sources, users, policies & settings
   if (user?.role === 'Admin') {
     navItems.push({ name: 'Chi nhánh', path: '/branches', icon: GitBranch });
     navItems.push({ name: 'Nguồn đặt phòng', path: '/sources', icon: Globe });
     navItems.push({ name: 'Khuyến mãi', path: '/promotions', icon: Tag });
     navItems.push({ name: 'Quản lý nhân viên', path: '/users', icon: UsersRound });
+    navItems.push({ name: 'Chính sách vận hành', path: '/policies', icon: ClockAlert });
     navItems.push({ name: 'Cài đặt hệ thống', path: '/settings', icon: Settings });
   }
 
