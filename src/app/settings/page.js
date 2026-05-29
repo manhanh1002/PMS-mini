@@ -541,22 +541,22 @@ function ApiGatewayTab({ settings, onChange }) {
           </div>
         </div>
 
-        {/* GET XML Availability Endpoint */}
+        {/* GET JSON Availability Endpoint */}
         <div className="p-4 rounded-xl border border-border bg-muted/10 space-y-3">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-500">GET</span>
-            <code className="text-xs font-mono font-semibold">/api/external/xml-availability</code>
+            <code className="text-xs font-mono font-semibold">/api/external/availability</code>
           </div>
-          <p className="text-xs text-muted-foreground">Lấy danh sách các phòng còn trống dưới dạng XML cho một chi nhánh, loại phòng và khung thời gian cụ thể. Hỗ trợ xác thực qua Header <code>x-api-key</code> hoặc tham số <code>apiKey</code> trên URL (thuận tiện cho việc hiển thị dạng trang liên kết trên trình duyệt).</p>
+          <p className="text-xs text-muted-foreground">Lấy danh sách các phòng còn trống dưới dạng JSON cho một chi nhánh, loại phòng và khung thời gian cụ thể. Danh sách phòng trống được trả về trọn vẹn trong một thuộc tính duy nhất <code>availableRooms</code>. Hỗ trợ xác thực qua Header <code>x-api-key</code> hoặc tham số <code>apiKey</code> trên URL.</p>
           <div className="relative group">
             <pre className="bg-background p-3 rounded-lg text-[11px] font-mono text-foreground overflow-x-auto">
-{`curl -X GET "https://<your-domain>/api/external/xml-availability?branchId=1&roomType=DELUXE&checkIn=2026-06-01&checkOut=2026-06-03" \\
+{`curl -X GET "https://<your-domain>/api/external/availability?branchId=1&roomType=DELUXE&checkIn=2026-06-01&checkOut=2026-06-03" \\
   -H "x-api-key: ${apiKey || 'YOUR_API_KEY'}"
 
 # Hoặc mở trực tiếp trên trình duyệt bằng link:
-https://<your-domain>/api/external/xml-availability?branchId=1&roomType=DELUXE&checkIn=2026-06-01&checkOut=2026-06-03&apiKey=${apiKey || 'YOUR_API_KEY'}`}
+https://<your-domain>/api/external/availability?branchId=1&roomType=DELUXE&checkIn=2026-06-01&checkOut=2026-06-03&apiKey=${apiKey || 'YOUR_API_KEY'}`}
             </pre>
-            <button onClick={() => copyToClipboard(`https://<your-domain>/api/external/xml-availability?branchId=1&roomType=DELUXE&checkIn=2026-06-01&checkOut=2026-06-03&apiKey=${apiKey || 'YOUR_API_KEY'}`)} className="absolute top-2 right-2 p-1.5 rounded bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground" title="Copy Link trình duyệt">
+            <button onClick={() => copyToClipboard(`https://<your-domain>/api/external/availability?branchId=1&roomType=DELUXE&checkIn=2026-06-01&checkOut=2026-06-03&apiKey=${apiKey || 'YOUR_API_KEY'}`)} className="absolute top-2 right-2 p-1.5 rounded bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground" title="Copy Link trình duyệt">
               <Copy className="h-3 w-3" />
             </button>
           </div>
