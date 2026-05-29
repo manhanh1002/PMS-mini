@@ -189,19 +189,19 @@ export default function BookingsPage() {
       </div>
 
       {/* Filters Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 w-full bg-card p-4 rounded-xl border border-border">
+        <div className="relative col-span-1 sm:col-span-6">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm theo tên khách, số điện thoại hoặc mã đơn..."
-            className="pl-10 bg-background border-border text-foreground text-xs"
+            className="pl-10 bg-background border-border text-foreground text-xs h-9 w-full"
           />
         </div>
-        <div className="w-[180px]">
+        <div className="col-span-1 sm:col-span-3">
           <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="bg-background border-border text-foreground text-xs">
+            <SelectTrigger className="w-full bg-background border-border text-foreground text-xs h-9">
               <SelectValue placeholder="Kênh / Nguồn đặt" />
             </SelectTrigger>
             <SelectContent className="bg-card border-border text-foreground text-xs">
@@ -215,9 +215,9 @@ export default function BookingsPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-[180px]">
+        <div className="col-span-1 sm:col-span-3">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="bg-background border-border text-foreground text-xs">
+            <SelectTrigger className="w-full bg-background border-border text-foreground text-xs h-9">
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
             <SelectContent className="bg-card border-border text-foreground text-xs">

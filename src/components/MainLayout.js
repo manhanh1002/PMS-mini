@@ -50,10 +50,8 @@ function LayoutContent({ children }) {
     { name: 'Sổ quỹ Thu Chi', path: '/cashbook', icon: Wallet },
   ];
 
-  // Only Admin can manage branches, sources, users, policies & settings
+  // Only Admin can manage users, policies, promotions & settings
   if (user?.role === 'Admin') {
-    navItems.push({ name: 'Chi nhánh', path: '/branches', icon: GitBranch });
-    navItems.push({ name: 'Nguồn đặt phòng', path: '/sources', icon: Globe });
     navItems.push({ name: 'Khuyến mãi', path: '/promotions', icon: Tag });
     navItems.push({ name: 'Quản lý nhân viên', path: '/users', icon: UsersRound });
     navItems.push({ name: 'Chính sách vận hành', path: '/policies', icon: ClockAlert });

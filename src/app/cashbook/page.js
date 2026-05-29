@@ -391,7 +391,7 @@ export default function CashBookPage() {
             Loại phiếu
           </label>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="bg-background border-border text-foreground text-xs h-9">
+            <SelectTrigger className="w-full bg-background border-border text-foreground text-xs h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-muted border-border text-foreground text-xs">
@@ -408,7 +408,7 @@ export default function CashBookPage() {
             Danh mục thu chi
           </label>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="bg-background border-border text-foreground text-xs h-9">
+            <SelectTrigger className="w-full bg-background border-border text-foreground text-xs h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-muted border-border text-foreground text-xs">

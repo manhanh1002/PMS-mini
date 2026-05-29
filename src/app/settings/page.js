@@ -12,14 +12,17 @@ import {
   Settings, Palette, ClockAlert, MessageSquareText,
   Info, Loader2, Save, CheckCircle2, RefreshCw, Hotel, Phone, MapPin,
   Building2, QrCode, AlarmClock, BrushCleaning, DoorOpen, Plus, Trash2, Users,
-  Webhook, Copy, Eye, EyeOff, Code
+  Webhook, Copy, Eye, EyeOff, Code, GitBranch, Globe, Pencil, Tag, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 const SETTING_TABS = [
   { id: 'branding', label: 'Thương hiệu', icon: Palette },
   { id: 'hotel', label: 'Thông tin khách sạn', icon: Hotel },
+  { id: 'branches', label: 'Quản lý chi nhánh', icon: GitBranch },
+  { id: 'booking_sources', label: 'Nguồn đặt phòng', icon: Globe },
   { id: 'billing', label: 'Thanh toán & QR', icon: QrCode },
   { id: 'room_types', label: 'Loại phòng', icon: DoorOpen },
   { id: 'api_gateway', label: 'Cổng API', icon: Webhook },
@@ -645,6 +648,518 @@ function SystemTab() {
   );
 }
 
+// ─── Branches Tab ────────────────────────────────────────────────────────────
+function BranchesTab() {
+  const { user, branches, refreshBranches } = useBranch();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Form states
+  const [editingId, setEditingId] = useState(null);
+  const [branchName, setBranchName] = useState('');
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchBranchesData = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshBranches();
+    } catch (e) {
+      console.error('Failed to load branches:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setBranchName('');
+    setAddress('');
+    setPhone('');
+    setNotes('');
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEdit = (item) => {
+    setEditingId(item.Id);
+    setBranchName(item.BranchName);
+    setAddress(item.Address || '');
+    setPhone(item.Phone || '');
+    setNotes(item.Notes || '');
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!branchName) {
+      toast.error('Vui lòng điền tên chi nhánh.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        BranchName: branchName,
+        Address: address,
+        Phone: phone,
+        Notes: notes
+      };
+
+      const method = editingId ? 'PATCH' : 'POST';
+      const body = editingId ? { id: editingId, ...payload } : payload;
+
+      const response = await fetch('/api/branches', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error);
+
+      toast.success(editingId ? 'Cập nhật chi nhánh thành công!' : 'Thêm chi nhánh thành công!');
+      setIsDialogOpen(false);
+      fetchBranchesData();
+      
+      // Force reload to update the Branch Selector dropdown in the layout header
+      window.location.reload();
+    } catch (e) {
+      toast.error(e.message || 'Lỗi lưu thông tin chi nhánh.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Title Header */}
+      <div className="flex justify-between items-center border-b border-border pb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <GitBranch className="h-5 w-5 text-primary" />
+            Quản lý chi nhánh Homestay
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Quản lý danh sách các cơ sở vận hành</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchBranchesData}
+            disabled={isRefreshing}
+            className="border-border hover:bg-muted text-muted-foreground hover:text-foreground h-8"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+
+          <Button size="sm" onClick={handleOpenCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs h-8">
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Thêm chi nhánh
+          </Button>
+        </div>
+      </div>
+
+      {/* Branches Table List */}
+      <div className="border border-border bg-card overflow-x-auto rounded-xl">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr className="border-b border-border">
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground w-16">ID</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Tên chi nhánh</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Địa chỉ</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Điện thoại</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Ghi chú ngân hàng/QR</th>
+              <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground w-20">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {branches.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-center py-12 text-xs text-muted-foreground">
+                  Chưa đăng ký chi nhánh nào.
+                </td>
+              </tr>
+            ) : (
+              branches.map((item, idx) => (
+                <tr key={item.Id} className={`border-b border-border last:border-0 hover:bg-muted/35 ${idx % 2 === 0 ? '' : 'bg-muted/10'}`}>
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">#{item.Id}</td>
+                  <td className="px-4 py-2.5 text-xs font-semibold text-foreground">{item.BranchName}</td>
+                  <td className="px-4 py-2.5 text-xs text-foreground">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="truncate max-w-[200px]">{item.Address || '-'}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-foreground font-mono">
+                    <span className="flex items-center gap-1">
+                      <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
+                      {item.Phone || '-'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground italic max-w-[200px] truncate" title={item.Notes}>
+                    {item.Notes || '-'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleOpenEdit(item)}
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md"
+                      title="Chỉnh sửa"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="bg-muted border-border text-foreground p-6 max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="text-base text-foreground font-semibold">
+              {editingId ? 'Chỉnh sửa chi nhánh' : 'Thêm chi nhánh mới'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-semibold">Tên chi nhánh *</label>
+              <Input
+                value={branchName}
+                onChange={(e) => setBranchName(e.target.value)}
+                placeholder="Ví dụ: Chi nhánh Đà Lạt, Homestay Vũng Tàu..."
+                className="bg-background border-border text-foreground text-xs"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-semibold">Địa chỉ chi nhánh</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Số 10, Lý Tự Trọng, Đà Lạt"
+                  className="pl-10 bg-background border-border text-foreground text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-semibold">Số điện thoại liên hệ</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="02633xxxxxx"
+                  className="pl-10 bg-background border-border text-foreground text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-semibold">Ghi chú thanh toán (Ngân hàng / Số tài khoản)</label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Techcombank: 190333xxxx - Nguyễn Văn A"
+                  className="pl-10 bg-background border-border text-foreground text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-border text-foreground hover:bg-muted text-xs">
+                Hủy
+              </Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={isSubmitting}>
+                {isSubmitting ? 'Đang lưu...' : 'Lưu lại'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── Booking Sources Tab ─────────────────────────────────────────────────────
+function BookingSourcesTab() {
+  const [sources, setSources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Form states
+  const [editingId, setEditingId] = useState(null);
+  const [sourceCode, setSourceCode] = useState('');
+  const [sourceName, setSourceName] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchSources = async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    try {
+      const response = await fetch('/api/booking-sources');
+      if (!response.ok) {
+        throw new Error('Không thể lấy danh sách nguồn đặt phòng');
+      }
+      const data = await response.json();
+      setSources(data);
+    } catch (e) {
+      toast.error(e.message || 'Lỗi tải danh sách nguồn đặt phòng.');
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSources();
+  }, []);
+
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setSourceCode('');
+    setSourceName('');
+    setNotes('');
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEdit = (item) => {
+    setEditingId(item.Id);
+    setSourceCode(item.SourceCode);
+    setSourceName(item.SourceName);
+    setNotes(item.Notes || '');
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!sourceCode.trim() || !sourceName.trim()) {
+      toast.error('Vui lòng nhập đầy đủ mã và tên nguồn.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        SourceCode: sourceCode.trim().toUpperCase(),
+        SourceName: sourceName.trim(),
+        Notes: notes.trim(),
+      };
+
+      const method = editingId ? 'PATCH' : 'POST';
+      const body = editingId ? { id: editingId, ...payload } : payload;
+
+      const response = await fetch('/api/booking-sources', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Lỗi lưu thông tin');
+
+      toast.success(editingId ? 'Cập nhật nguồn đặt thành công!' : 'Thêm nguồn đặt thành công!');
+      setIsDialogOpen(false);
+      fetchSources();
+    } catch (e) {
+      toast.error(e.message || 'Lỗi lưu thông tin nguồn đặt phòng.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa nguồn đặt phòng này?')) return;
+
+    try {
+      const response = await fetch(`/api/booking-sources?id=${id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Lỗi xóa nguồn');
+
+      toast.success('Xóa nguồn đặt phòng thành công!');
+      fetchSources();
+    } catch (e) {
+      toast.error(e.message || 'Không thể xóa nguồn đặt phòng.');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Title Header */}
+      <div className="flex justify-between items-center border-b border-border pb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <Globe className="h-5 w-5 text-primary" />
+            Quản lý nguồn đặt phòng
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Quản lý các kênh bán hàng (Direct, OTA, OTA Agents, Social networks...)</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchSources(true)}
+            disabled={isRefreshing || loading}
+            className="border-border hover:bg-muted text-muted-foreground hover:text-foreground h-8"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+
+          <Button size="sm" onClick={handleOpenCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs h-8">
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Thêm nguồn đặt
+          </Button>
+        </div>
+      </div>
+
+      {/* List Table */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="text-xs">Đang tải danh sách nguồn đặt phòng...</span>
+        </div>
+      ) : (
+        <div className="border border-border bg-card overflow-x-auto rounded-xl">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr className="border-b border-border">
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground w-16">ID</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground w-32">Mã nguồn</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Tên nguồn đặt phòng</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Ghi chú</th>
+                <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground w-24">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sources.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-12 text-xs text-muted-foreground">
+                    Chưa đăng ký nguồn đặt phòng nào.
+                  </td>
+                </tr>
+              ) : (
+                sources.map((item, idx) => (
+                  <tr key={item.Id} className={`border-b border-border last:border-0 hover:bg-muted/35 ${idx % 2 === 0 ? '' : 'bg-muted/10'}`}>
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">#{item.Id}</td>
+                    <td className="px-4 py-2.5 text-xs font-mono font-bold text-primary">
+                      <span className="px-2 py-0.5 rounded bg-primary/10 border border-primary/20">
+                        {item.SourceCode}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs font-semibold text-foreground">{item.SourceName}</td>
+                    <td className="px-4 py-2.5 text-xs text-muted-foreground italic max-w-[250px] truncate" title={item.Notes}>
+                      {item.Notes || '-'}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEdit(item)}
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md"
+                          title="Chỉnh sửa"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(item.Id)}
+                          className="h-7 w-7 text-rose-500 hover:text-rose-400 hover:bg-rose-950/20 rounded-md"
+                          title="Xóa"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Add / Edit Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="bg-muted border-border text-foreground p-6 max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="text-base text-foreground font-semibold">
+              {editingId ? 'Chỉnh sửa nguồn đặt phòng' : 'Thêm nguồn đặt phòng mới'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-semibold">Mã nguồn (chữ in hoa) *</label>
+              <div className="relative">
+                <Tag className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={sourceCode}
+                  onChange={(e) => setSourceCode(e.target.value)}
+                  placeholder="Ví dụ: DIRECT, AGODA, FACEBOOK, WALK_IN"
+                  className="pl-10 bg-background border-border text-foreground text-xs font-mono"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-semibold">Tên nguồn đặt phòng *</label>
+              <Input
+                value={sourceName}
+                onChange={(e) => setSourceName(e.target.value)}
+                placeholder="Ví dụ: Trực tiếp / Walk-in, Agoda OTA, Trang Facebook..."
+                className="bg-background border-border text-foreground text-xs"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-semibold">Ghi chú / Mô tả</label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ghi chú thêm về kênh đặt phòng này..."
+                  className="pl-10 bg-background border-border text-foreground text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-border text-foreground hover:bg-muted text-xs">
+                Hủy
+              </Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs" disabled={isSubmitting}>
+                {isSubmitting ? 'Đang lưu...' : 'Lưu lại'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { user, refreshSettings } = useBranch();
@@ -759,6 +1274,8 @@ export default function SettingsPage() {
               <CardContent className="pt-6 pb-6">
                 {activeTab === 'branding' && <BrandingTab settings={settings} onChange={handleChange} />}
                 {activeTab === 'hotel' && <HotelTab settings={settings} onChange={handleChange} />}
+                {activeTab === 'branches' && <BranchesTab />}
+                {activeTab === 'booking_sources' && <BookingSourcesTab />}
                 {activeTab === 'billing' && <BillingTab settings={settings} onChange={handleChange} />}
 
                 {activeTab === 'room_types' && <RoomTypesTab settings={settings} onChange={handleChange} />}
@@ -769,7 +1286,7 @@ export default function SettingsPage() {
             </Card>
 
             {/* Save button at bottom */}
-            {activeTab !== 'system' && activeTab !== 'room_types' && (
+            {activeTab !== 'system' && activeTab !== 'room_types' && activeTab !== 'branches' && activeTab !== 'booking_sources' && (
               <div className="mt-4 flex items-center gap-3">
                 <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
