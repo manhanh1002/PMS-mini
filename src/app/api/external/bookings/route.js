@@ -1,6 +1,7 @@
 import { noco } from '@/lib/nocodb';
 import { NextResponse } from 'next/server';
 import { checkRoomAvailability, findAvailableRoom } from '@/lib/conflict';
+import { calculateRoomCharge } from '@/lib/pricing';
 
 
 // Helper to authenticate via x-api-key
@@ -116,66 +117,22 @@ export async function POST(request) {
     if (availability.conflict) {
       return NextResponse.json({ error: availability.message }, { status: 409 });
     }
-
     // Calculate default price if not provided
     let finalTotalPrice = 0;
     if (data.TotalPrice !== undefined && data.TotalPrice !== null && data.TotalPrice !== '') {
       finalTotalPrice = Number(data.TotalPrice);
     } else if (room) {
-      const bookingType = data.BookingType || 'Daily';
-      const checkInTime = data.CheckInTime || '14:00';
-      const checkOutTime = data.CheckOutTime || '12:00';
-      
-      if (bookingType === 'Hourly') {
-        const start = new Date(`${data.CheckInDate}T${checkInTime}`);
-        const end = new Date(`${data.CheckOutDate}T${checkOutTime}`);
-        const diffHours = Math.ceil((end - start) / (1000 * 60 * 60));
-        if (diffHours > 0) {
-          const baseHourly = Number(room.HourlyPrice || room.Price * 0.2);
-          const extraHourly = Number(room.ExtraHourPrice || room.Price * 0.05);
-          if (diffHours <= 2) {
-            finalTotalPrice = baseHourly;
-          } else {
-            finalTotalPrice = baseHourly + (diffHours - 2) * extraHourly;
-          }
-        }
-      } else if (bookingType === 'Overnight') {
-        const start = new Date(`${data.CheckInDate}T${data.CheckInTime || '22:00'}`);
-        const end = new Date(`${data.CheckOutDate}T${data.CheckOutTime || '10:00'}`);
-        const diffTime = end - start;
-        const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-        finalTotalPrice = nights * Number(room.OvernightPrice || room.Price * 0.7);
-      } else {
-        // Daily
-        const start = new Date(data.CheckInDate);
-        const end = new Date(data.CheckOutDate);
-        const diffTime = end - start;
-        const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-        
-        finalTotalPrice = nights * Number(room.Price || 0);
-        
-        const extraHourly = Number(room.ExtraHourPrice || room.Price * 0.05);
-        const inHour = parseInt(checkInTime.split(':')[0], 10);
-        if (inHour < 14) {
-          const earlyHours = 14 - inHour;
-          if (earlyHours <= 4) {
-            finalTotalPrice += earlyHours * extraHourly;
-          } else {
-            finalTotalPrice += Number(room.Price || 0);
-          }
-        }
-        const outHour = parseInt(checkOutTime.split(':')[0], 10);
-        if (outHour > 12) {
-          const lateHours = outHour - 12;
-          if (lateHours <= 4) {
-            finalTotalPrice += lateHours * extraHourly;
-          } else {
-            finalTotalPrice += Number(room.Price || 0);
-          }
-        }
-      }
+      const settings = await noco.getSettings().catch(() => ({}));
+      finalTotalPrice = calculateRoomCharge({
+        room,
+        bookingType: data.BookingType || 'Daily',
+        checkInDate: data.CheckInDate,
+        checkInTime: data.CheckInTime || '14:00',
+        checkOutDate: data.CheckOutDate,
+        checkOutTime: data.CheckOutTime || '12:00',
+        settings
+      });
     }
-
     // Prepare payload
     const payload = {
       RoomId: data.RoomId,

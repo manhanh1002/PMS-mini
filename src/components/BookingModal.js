@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useBranch } from './BranchContext';
 import { Plus, Trash2, Printer, Loader2, CreditCard, Utensils, Calendar as CalendarIcon, Phone, User, FileText, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { calculateRoomCharge } from '@/lib/pricing';
 
-export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId, initialDate, onSave }) {
+export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId, initialDate, initialTime, onSave }) {
   const { selectedBranch, user, systemSettings } = useBranch();
   const loadedInitialChargeRef = React.useRef(null);
   
@@ -40,6 +41,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [hasManuallyChangedBookingType, setHasManuallyChangedBookingType] = useState(false);
 
   
   // Services & Payments states
@@ -110,15 +112,29 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
         setCustomerName('');
         setCustomerPhone('');
         setCheckInDate(initialDate || '');
-        setCheckOutDate('');
         setRoomCharge(0);
         setIsCustomPrice(false);
         setStatus('Pending');
         setNotes('');
         setBookingSourceId('');
-        setBookingType('Daily');
-        setCheckInTime('14:00');
-        setCheckOutTime('12:00');
+        setHasManuallyChangedBookingType(false);
+        
+        if (initialTime) {
+          setBookingType('Hourly');
+          setCheckInTime(initialTime);
+          
+          let [h, m] = initialTime.split(':').map(Number);
+          h = (h + 2) % 24;
+          const outTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          setCheckOutTime(outTime);
+          setCheckOutDate(initialDate || '');
+        } else {
+          setBookingType('Daily');
+          setCheckInTime(systemSettings?.DefaultCheckInTime || '14:00');
+          setCheckOutTime(systemSettings?.DefaultCheckOutTime || '12:00');
+          setCheckOutDate('');
+        }
+        
         setGuestCount(1);
         setPromoCode('');
         setAppliedPromo(null);
@@ -149,65 +165,115 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
       .catch(() => setBusyRanges([]));
   }, [roomId, bookingId]);
 
+  // Smart auto-detection of booking type (Daily, Hourly, Overnight)
+  useEffect(() => {
+    if (!bookingId && !hasManuallyChangedBookingType && checkInDate && checkOutDate) {
+      const start = new Date(`${checkInDate}T${checkInTime || '14:00'}`);
+      const end = new Date(`${checkOutDate}T${checkOutTime || '12:00'}`);
+      const diffHours = (end - start) / (1000 * 60 * 60);
+
+      const overnightStart = systemSettings?.OvernightStart || '21:00';
+      const overnightEnd = systemSettings?.OvernightEnd || '10:00';
+      
+      const parseTimeToDecimal = (timeStr) => {
+        if (!timeStr) return 0;
+        const parts = timeStr.split(':');
+        return (parseInt(parts[0], 10) || 0) + (parseInt(parts[1], 10) || 0) / 60;
+      };
+
+      const inHour = parseTimeToDecimal(checkInTime || '14:00');
+      const outHour = parseTimeToDecimal(checkOutTime || '12:00');
+      const startHourLimit = parseTimeToDecimal(overnightStart);
+      const endHourLimit = parseTimeToDecimal(overnightEnd);
+
+      const dStart = new Date(checkInDate);
+      dStart.setHours(0,0,0,0);
+      const dEnd = new Date(checkOutDate);
+      dEnd.setHours(0,0,0,0);
+      const isNextDay = (dEnd - dStart) / (1000 * 60 * 60 * 24) === 1;
+
+      // Overnight condition: check-in is today evening (>= overnightStart), check-out is tomorrow morning (<= overnightEnd)
+      if (isNextDay && inHour >= startHourLimit && outHour <= endHourLimit) {
+        setBookingType('Overnight');
+      } else if (diffHours > 0 && diffHours < 12 && checkInDate === checkOutDate) {
+        setBookingType('Hourly');
+      } else {
+        setBookingType('Daily');
+      }
+    }
+  }, [checkInDate, checkInTime, checkOutDate, checkOutTime, bookingId, hasManuallyChangedBookingType, systemSettings]);
+
+  // Auto-sync checkOutDate for Hourly and Overnight modes
+  useEffect(() => {
+    if (!checkInDate) return;
+
+    const addDays = (dateStr, days) => {
+      const d = new Date(dateStr);
+      d.setDate(d.getDate() + days);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    if (bookingType === 'Overnight') {
+      // Overnight rule: check-in 00:00 - 06:00 -> checkout same day; otherwise check-in date + 1
+      const isEarlyMorning = checkInTime >= '00:00' && checkInTime <= '06:00';
+      const expectedCheckOutDate = isEarlyMorning ? checkInDate : addDays(checkInDate, 1);
+      if (checkOutDate !== expectedCheckOutDate) {
+        setCheckOutDate(expectedCheckOutDate);
+      }
+    } else if (bookingType === 'Hourly') {
+      // Hourly rule: checkout time <= checkin time -> checkout date + 1; otherwise checkin date
+      const isCrossMidnight = checkOutTime <= checkInTime;
+      const expectedCheckOutDate = isCrossMidnight ? addDays(checkInDate, 1) : checkInDate;
+      if (checkOutDate !== expectedCheckOutDate) {
+        setCheckOutDate(expectedCheckOutDate);
+      }
+    }
+  }, [bookingType, checkInDate, checkInTime, checkOutTime, checkOutDate]);
+
+  // Resolve dummy appliedPromo to full promotion details once promotions list is loaded
+  useEffect(() => {
+    if (appliedPromo && appliedPromo.isDummy && promotions.length > 0) {
+      const fullPromo = promotions.find(p => p.Code === appliedPromo.Code);
+      if (fullPromo) {
+        setAppliedPromo(fullPromo);
+      }
+    }
+  }, [promotions, appliedPromo]);
+
+  // Auto-verify or revoke applied promo when bookingType changes
+  useEffect(() => {
+    if (appliedPromo && !appliedPromo.isDummy) {
+      const allowedBookingTypesStr = appliedPromo.BookingTypes || 'Daily';
+      const allowedBookingTypes = allowedBookingTypesStr.split(',').map(t => t.trim().toLowerCase());
+      if (!allowedBookingTypes.includes(bookingType.toLowerCase())) {
+        toast.warning(`Mã khuyến mãi ${appliedPromo.Code} không áp dụng cho hình thức đặt phòng mới. Mã đã bị thu hồi.`);
+        setAppliedPromo(null);
+        setDiscountAmount(0);
+        // Remove free service if added
+        if (appliedPromo.FreeServiceId && appliedPromo.FreeServiceId !== 'none') {
+          setServicesOrdered(prev => prev.filter(s => s.ServiceId !== appliedPromo.FreeServiceId || s.Notes !== 'Tặng kèm Voucher'));
+        }
+      }
+    }
+  }, [bookingType, appliedPromo]);
+
   // Compute roomCharge automatically when nights / hours / room changes
   useEffect(() => {
     if (roomId && checkInDate && checkOutDate && !isCustomPrice) {
       const room = rooms.find(r => String(r.Id) === String(roomId));
       if (room) {
-        let baseCharge = 0;
-        
-        if (bookingType === 'Hourly') {
-          const start = new Date(`${checkInDate}T${checkInTime || '14:00'}`);
-          const end = new Date(`${checkOutDate}T${checkOutTime || '12:00'}`);
-          const diffHours = Math.ceil((end - start) / (1000 * 60 * 60));
-          if (diffHours > 0) {
-            let baseHourly = Number(room.HourlyPrice || room.Price * 0.2); // Fallback to 20% of daily if empty
-            let extraHourly = Number(room.ExtraHourPrice || room.Price * 0.05); // Fallback to 5%
-            
-            if (diffHours <= 2) {
-              baseCharge = baseHourly;
-            } else {
-              baseCharge = baseHourly + (diffHours - 2) * extraHourly;
-            }
-          }
-        } else if (bookingType === 'Overnight') {
-          const start = new Date(`${checkInDate}T${checkInTime || '22:00'}`);
-          const end = new Date(`${checkOutDate}T${checkOutTime || '10:00'}`);
-          const diffTime = end - start;
-          const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-          baseCharge = nights * Number(room.OvernightPrice || room.Price * 0.7); // Fallback 70%
-        } else {
-          // Daily
-          const start = new Date(checkInDate);
-          const end = new Date(checkOutDate);
-          const diffTime = end - start;
-          const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-          
-          baseCharge = nights * Number(room.Price);
-          let extraHourly = Number(room.ExtraHourPrice || room.Price * 0.05);
-
-          // Early Check-in logic (Standard IN: 14:00)
-          const inHour = parseInt((checkInTime || '14:00').split(':')[0], 10);
-          if (inHour < 14) {
-            const earlyHours = 14 - inHour;
-            if (earlyHours <= 4) {
-              baseCharge += earlyHours * extraHourly;
-            } else {
-              baseCharge += Number(room.Price); // Half or full day rule, default to full day here if > 4h
-            }
-          }
-
-          // Late Check-out logic (Standard OUT: 12:00)
-          const outHour = parseInt((checkOutTime || '12:00').split(':')[0], 10);
-          if (outHour > 12) {
-            const lateHours = outHour - 12;
-            if (lateHours <= 4) {
-              baseCharge += lateHours * extraHourly;
-            } else {
-              baseCharge += Number(room.Price);
-            }
-          }
-        }
+        const baseCharge = calculateRoomCharge({
+          room,
+          bookingType,
+          checkInDate,
+          checkInTime,
+          checkOutDate,
+          checkOutTime,
+          settings: systemSettings
+        });
 
         // Compare with loadedInitialCharge if it's the first render after loading
         if (loadedInitialChargeRef.current !== null) {
@@ -225,7 +291,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
         }
       }
     }
-  }, [roomId, checkInDate, checkOutDate, bookingType, checkInTime, checkOutTime, rooms, isCustomPrice]);
+  }, [roomId, checkInDate, checkOutDate, bookingType, checkInTime, checkOutTime, rooms, isCustomPrice, systemSettings]);
 
   // Dynamic Service Charge
   const serviceCharge = servicesOrdered.reduce((acc, so) => {
@@ -292,12 +358,13 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
       setNotes(data.Notes || '');
       setBookingSourceId(data.BookingSourceId ? String(data.BookingSourceId) : '');
       setBookingType(data.BookingType || 'Daily');
+      setHasManuallyChangedBookingType(true);
       setCheckInTime(data.CheckInTime || '14:00');
       setCheckOutTime(data.CheckOutTime || '12:00');
       setGuestCount(data.GuestCount ? Number(data.GuestCount) : 1);
       setPromoCode(data.PromoCode || '');
       if (data.PromoCode) {
-        setAppliedPromo({ Code: data.PromoCode }); // Dummy for UI display
+        setAppliedPromo({ Code: data.PromoCode, isDummy: true }); // Dummy for UI display
       } else {
         setAppliedPromo(null);
       }
@@ -400,7 +467,12 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
       const res = await fetch('/api/promotions/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Code: promoCode.trim(), RoomType: selectedRoom?.RoomType, Nights: nights })
+        body: JSON.stringify({
+          Code: promoCode.trim(),
+          RoomType: selectedRoom?.RoomType,
+          Nights: nights,
+          BookingType: bookingType
+        })
       });
       const data = await res.json();
       
@@ -628,6 +700,36 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
 
   const isRoomLocked = status === 'CheckedIn' || status === 'CheckedOut' || status === 'Cancelled';
 
+  const handleTabChange = (type) => {
+    setBookingType(type);
+    setHasManuallyChangedBookingType(true);
+
+    if (type === 'Hourly') {
+      setCheckOutDate(checkInDate);
+    } else if (type === 'Overnight') {
+      if (checkInDate) {
+        const d = new Date(checkInDate);
+        d.setDate(d.getDate() + 1);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        setCheckOutDate(`${yyyy}-${mm}-${dd}`);
+      }
+      
+      const overnightStart = systemSettings?.OvernightStart || '21:00';
+      const overnightEnd = systemSettings?.OvernightEnd || '10:00';
+      if (checkInTime === '14:00' || checkInTime === systemSettings?.DefaultCheckInTime) {
+        setCheckInTime(overnightStart);
+      }
+      if (checkOutTime === '12:00' || checkOutTime === systemSettings?.DefaultCheckOutTime) {
+        setCheckOutTime(overnightEnd);
+      }
+    } else if (type === 'Daily') {
+      setCheckInTime(systemSettings?.DefaultCheckInTime || '14:00');
+      setCheckOutTime(systemSettings?.DefaultCheckOutTime || '12:00');
+    }
+  };
+
   const renderGeneralInfoTab = () => (
     <div className="flex flex-col gap-4">
       <form id="booking-form" onSubmit={handleSaveGeneral} className="space-y-4">
@@ -660,39 +762,7 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                       />
                     </div>
                   </div>
-
                   <div className="space-y-2">
-                    <label className="text-xs text-muted-foreground font-semibold">Loại đặt phòng *</label>
-                    <Select value={bookingType} onValueChange={setBookingType} disabled={isSubmitting || isRoomLocked}>
-                      <SelectTrigger className="bg-background border-border text-foreground text-left truncate">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-muted border-border text-foreground">
-                        <SelectItem value="Daily">Theo ngày (Daily)</SelectItem>
-                        <SelectItem value="Hourly">Theo giờ (Hourly)</SelectItem>
-                        <SelectItem value="Overnight">Qua đêm (Overnight)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs text-muted-foreground font-semibold">Nguồn đặt phòng</label>
-                    <Select value={bookingSourceId || 'none'} onValueChange={setBookingSourceId} disabled={isSubmitting}>
-                      <SelectTrigger className="bg-background border-border text-foreground text-left truncate">
-                        <SelectValue placeholder="Chọn nguồn đặt phòng" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-muted border-border text-foreground">
-                        <SelectItem value="none">⚠️ Chưa gán nguồn / Trống</SelectItem>
-                        {bookingSources.map((source) => (
-                          <SelectItem key={source.Id} value={String(source.Id)}>
-                            {source.SourceName} ({source.SourceCode})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2 sm:col-span-2">
                     <label className="text-xs text-muted-foreground font-semibold">Phòng đăng ký *</label>
                     <Select value={String(roomId)} onValueChange={setRoomId} disabled={isSubmitting || isRoomLocked}>
                       <SelectTrigger className="bg-background border-border text-foreground text-left truncate">
@@ -714,56 +784,177 @@ export default function BookingModal({ isOpen, onClose, bookingId, initialRoomId
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs text-muted-foreground font-semibold">Thời gian nhận phòng (Check-in) *</label>
-                    <div className="grid grid-cols-7 gap-2">
-                      <div className="relative col-span-4">
-                        <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="date"
-                          value={checkInDate}
-                          min={!bookingId ? todayStr : undefined}
-                          onChange={(e) => setCheckInDate(e.target.value)}
-                          className="pl-9 bg-background border-border text-foreground text-xs sm:text-sm"
-                          required
-                          disabled={isSubmitting || isRoomLocked}
-                        />
-                      </div>
-                      <Input
-                        type="time"
-                        value={checkInTime}
-                        onChange={(e) => setCheckInTime(e.target.value)}
-                        className="col-span-3 bg-background border-border text-foreground text-xs sm:text-sm px-2 text-center"
-                        required
-                        disabled={isSubmitting || isRoomLocked}
-                      />
-                    </div>
+                    <label className="text-xs text-muted-foreground font-semibold">Nguồn đặt phòng</label>
+                    <Select value={bookingSourceId || 'none'} onValueChange={setBookingSourceId} disabled={isSubmitting}>
+                      <SelectTrigger className="bg-background border-border text-foreground text-left truncate">
+                        <SelectValue placeholder="Chọn nguồn đặt phòng" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-muted border-border text-foreground">
+                        <SelectItem value="none">⚠️ Chưa gán nguồn / Trống</SelectItem>
+                        {bookingSources.map((source) => (
+                          <SelectItem key={source.Id} value={String(source.Id)}>
+                            {source.SourceName} ({source.SourceCode})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-xs text-muted-foreground font-semibold">Thời gian trả phòng (Check-out) *</label>
-                    <div className="grid grid-cols-7 gap-2">
-                      <div className="relative col-span-4">
-                        <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="date"
-                          value={checkOutDate}
-                          min={checkInDate || (!bookingId ? todayStr : undefined)}
-                          onChange={(e) => setCheckOutDate(e.target.value)}
-                          className="pl-9 bg-background border-border text-foreground text-xs sm:text-sm"
-                          required
-                          disabled={isSubmitting}
-                        />
+                  {/* Tabs select for Date/Time picker based on mode */}
+                  <Tabs value={bookingType} onValueChange={handleTabChange} className="w-full sm:col-span-2 border border-border/80 rounded-xl p-4 bg-muted/20">
+                    <TabsList className="grid w-full grid-cols-3 bg-muted border border-border">
+                      <TabsTrigger value="Daily" disabled={isRoomLocked}>Theo ngày (Daily)</TabsTrigger>
+                      <TabsTrigger value="Overnight" disabled={isRoomLocked}>Qua đêm (Overnight)</TabsTrigger>
+                      <TabsTrigger value="Hourly" disabled={isRoomLocked}>Theo giờ (Hourly)</TabsTrigger>
+                    </TabsList>
+
+                    {/* Daily Tab Content */}
+                    <TabsContent value="Daily" className="space-y-4 mt-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground font-semibold">Thời gian nhận phòng (Check-in) *</label>
+                          <div className="grid grid-cols-7 gap-2">
+                            <div className="relative col-span-4">
+                              <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="date"
+                                value={checkInDate}
+                                min={!bookingId ? todayStr : undefined}
+                                onChange={(e) => setCheckInDate(e.target.value)}
+                                className="pl-9 bg-background border-border text-foreground text-xs sm:text-sm"
+                                required
+                                disabled={isSubmitting || isRoomLocked}
+                              />
+                            </div>
+                            <Input
+                              type="time"
+                              value={checkInTime}
+                              onChange={(e) => setCheckInTime(e.target.value)}
+                              className="col-span-3 bg-background border-border text-foreground text-xs sm:text-sm px-2 text-center"
+                              required
+                              disabled={isSubmitting || isRoomLocked}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground font-semibold">Thời gian trả phòng (Check-out) *</label>
+                          <div className="grid grid-cols-7 gap-2">
+                            <div className="relative col-span-4">
+                              <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="date"
+                                value={checkOutDate}
+                                min={checkInDate || (!bookingId ? todayStr : undefined)}
+                                onChange={(e) => setCheckOutDate(e.target.value)}
+                                className="pl-9 bg-background border-border text-foreground text-xs sm:text-sm"
+                                required
+                                disabled={isSubmitting}
+                              />
+                            </div>
+                            <Input
+                              type="time"
+                              value={checkOutTime}
+                              onChange={(e) => setCheckOutTime(e.target.value)}
+                              className="col-span-3 bg-background border-border text-foreground text-xs sm:text-sm px-2 text-center"
+                              required
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <Input
-                        type="time"
-                        value={checkOutTime}
-                        onChange={(e) => setCheckOutTime(e.target.value)}
-                        className="col-span-3 bg-background border-border text-foreground text-xs sm:text-sm px-2 text-center"
-                        required
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                  </div>
+                    </TabsContent>
+
+                    {/* Overnight Tab Content */}
+                    <TabsContent value="Overnight" className="space-y-4 mt-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground font-semibold">Ngày nhận phòng *</label>
+                          <div className="relative">
+                            <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="date"
+                              value={checkInDate}
+                              min={!bookingId ? todayStr : undefined}
+                              onChange={(e) => setCheckInDate(e.target.value)}
+                              className="pl-9 bg-background border-border text-foreground text-xs sm:text-sm"
+                              required
+                              disabled={isSubmitting || isRoomLocked}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground font-semibold">Giờ nhận phòng (Clock-in) *</label>
+                          <Input
+                            type="time"
+                            value={checkInTime}
+                            onChange={(e) => setCheckInTime(e.target.value)}
+                            className="bg-background border-border text-foreground text-xs sm:text-sm px-3"
+                            required
+                            disabled={isSubmitting || isRoomLocked}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground font-semibold">Giờ trả phòng (Clock-out) *</label>
+                          <Input
+                            type="time"
+                            value={checkOutTime}
+                            onChange={(e) => setCheckOutTime(e.target.value)}
+                            className="bg-background border-border text-foreground text-xs sm:text-sm px-3"
+                            required
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    {/* Hourly Tab Content */}
+                    <TabsContent value="Hourly" className="space-y-4 mt-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground font-semibold">Ngày nhận phòng *</label>
+                          <div className="relative">
+                            <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="date"
+                              value={checkInDate}
+                              min={!bookingId ? todayStr : undefined}
+                              onChange={(e) => setCheckInDate(e.target.value)}
+                              className="pl-9 bg-background border-border text-foreground text-xs sm:text-sm"
+                              required
+                              disabled={isSubmitting || isRoomLocked}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground font-semibold">Giờ nhận phòng (Clock-in) *</label>
+                          <Input
+                            type="time"
+                            value={checkInTime}
+                            onChange={(e) => setCheckInTime(e.target.value)}
+                            className="bg-background border-border text-foreground text-xs sm:text-sm px-3"
+                            required
+                            disabled={isSubmitting || isRoomLocked}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground font-semibold">Giờ trả phòng (Clock-out) *</label>
+                          <Input
+                            type="time"
+                            value={checkOutTime}
+                            onChange={(e) => setCheckOutTime(e.target.value)}
+                            className="bg-background border-border text-foreground text-xs sm:text-sm px-3"
+                            required
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
 
                   {/* Busy ranges banner & Conflict warning */}
                   {roomId && (busyRanges.length > 0 || (hasConflict && checkInDate && checkOutDate)) && (

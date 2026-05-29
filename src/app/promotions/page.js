@@ -27,7 +27,7 @@ export default function PromotionsPage() {
   const [editForm, setEditForm] = useState({
     Code: '', Name: '', Type: 'Percentage', Value: '', MaxDiscount: '', 
     MinNights: '', RoomTypes: [], ValidFrom: '', ValidTo: '', UsageLimit: '', Status: 'Active',
-    ApplyScope: 'RoomOnly', FreeServiceId: 'none'
+    ApplyScope: 'RoomOnly', FreeServiceId: 'none', BookingTypes: ['Daily']
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -74,7 +74,7 @@ export default function PromotionsPage() {
     setEditForm({
       Code: '', Name: '', Type: 'Percentage', Value: '', MaxDiscount: '', 
       MinNights: '', RoomTypes: [], ValidFrom: '', ValidTo: '', UsageLimit: '', Status: 'Active',
-      ApplyScope: 'RoomOnly', FreeServiceId: 'none'
+      ApplyScope: 'RoomOnly', FreeServiceId: 'none', BookingTypes: ['Daily']
     });
     setIsDialogOpen(true);
   };
@@ -89,7 +89,8 @@ export default function PromotionsPage() {
       ValidTo: item.ValidTo ? item.ValidTo.split(' ')[0] : '', 
       UsageLimit: item.UsageLimit || '', Status: item.Status || 'Active',
       ApplyScope: item.ApplyScope || 'RoomOnly',
-      FreeServiceId: item.FreeServiceId ? String(item.FreeServiceId) : 'none'
+      FreeServiceId: item.FreeServiceId ? String(item.FreeServiceId) : 'none',
+      BookingTypes: item.BookingTypes ? item.BookingTypes.split(',').map(b => b.trim()) : ['Daily']
     });
     setIsDialogOpen(true);
   };
@@ -121,7 +122,8 @@ export default function PromotionsPage() {
         UsageLimit: editForm.UsageLimit ? Number(editForm.UsageLimit) : null,
         Status: editForm.Status,
         ApplyScope: editForm.ApplyScope,
-        FreeServiceId: editForm.FreeServiceId !== 'none' ? Number(editForm.FreeServiceId) : null
+        FreeServiceId: editForm.FreeServiceId !== 'none' ? Number(editForm.FreeServiceId) : null,
+        BookingTypes: editForm.BookingTypes && editForm.BookingTypes.length > 0 ? editForm.BookingTypes.join(',') : 'Daily'
       };
 
       const method = editingId ? 'PATCH' : 'POST';
@@ -222,7 +224,20 @@ export default function PromotionsPage() {
                       <TableCell className="text-xs font-mono font-bold text-primary">
                         <span className="px-2 py-0.5 rounded bg-primary/10 border border-primary/20">{item.Code}</span>
                       </TableCell>
-                      <TableCell className="text-xs font-semibold text-foreground">{item.Name}</TableCell>
+                      <TableCell className="text-xs font-semibold text-foreground">
+                        {item.Name}
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {(item.BookingTypes || 'Daily').split(',').map(bt => {
+                            let label = bt === 'Daily' ? 'Theo ngày' : bt === 'Overnight' ? 'Qua đêm' : 'Theo giờ';
+                            let color = bt === 'Daily' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : bt === 'Overnight' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+                            return (
+                              <span key={bt} className={`text-[9px] px-1 py-0.2 rounded border ${color}`}>
+                                {label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs text-foreground">
                         {item.Type === 'Percentage' ? `${item.Value}%` : `${Number(item.Value).toLocaleString('vi-VN')}đ`}
                         {item.Type === 'Percentage' && item.MaxDiscount && <span className="text-muted-foreground text-[10px] block">Tối đa: {Number(item.MaxDiscount).toLocaleString('vi-VN')}đ</span>}
@@ -373,6 +388,38 @@ export default function PromotionsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 border-t border-border pt-3 mt-2">
+              <label className="text-xs text-muted-foreground font-semibold mb-1 block">Hình thức đặt phòng áp dụng (Chọn ít nhất một hình thức)</label>
+              <div className="flex gap-4">
+                {[
+                  { value: 'Daily', label: 'Theo ngày (Daily)' },
+                  { value: 'Overnight', label: 'Qua đêm (Overnight)' },
+                  { value: 'Hourly', label: 'Theo giờ (Hourly)' }
+                ].map(opt => (
+                  <label key={opt.value} className="flex items-center gap-1.5 text-xs bg-background px-3 py-1.5 rounded border border-border hover:bg-muted cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-neutral-700 bg-muted text-primary"
+                      checked={editForm.BookingTypes?.includes(opt.value)}
+                      onChange={(e) => {
+                        const currentTypes = editForm.BookingTypes || [];
+                        if (e.target.checked) {
+                          setEditForm({...editForm, BookingTypes: [...currentTypes, opt.value]});
+                        } else {
+                          if (currentTypes.length <= 1) {
+                            toast.error('Vui lòng chọn ít nhất một hình thức đặt phòng.');
+                            return;
+                          }
+                          setEditForm({...editForm, BookingTypes: currentTypes.filter(t => t !== opt.value)});
+                        }
+                      }}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
               </div>
             </div>
 

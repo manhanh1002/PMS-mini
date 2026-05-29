@@ -38,9 +38,24 @@ export default function CalendarPage() {
   const [isChoiceOpen, setIsChoiceOpen] = useState(false);
   const [choiceRoomId, setChoiceRoomId] = useState('');
   const [choiceDate, setChoiceDate] = useState('');
+  const [choiceTime, setChoiceTime] = useState('');
   
   // Block Modal states
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+
+  // View modes
+  const [viewMode, setViewMode] = useState('daily');
+  const [hourlyDate, setHourlyDate] = useState(new Date());
+  const [initialTime, setInitialTime] = useState('');
+
+  // Current time indicator logic
+  const [currentTime, setCurrentTime] = useState(new Date());
+  useEffect(() => {
+    if (viewMode === 'hourly') {
+      const interval = setInterval(() => setCurrentTime(new Date()), 60000);
+      return () => clearInterval(interval);
+    }
+  }, [viewMode]);
 
   // Timeline config
   const [numDays, setNumDays] = useState(14);
@@ -147,15 +162,17 @@ export default function CalendarPage() {
     return Math.round(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const handleOpenNewBooking = (roomId = '', date = '') => {
+  const handleOpenNewBooking = (roomId = '', date = '', time = '') => {
     if (roomId && date) {
       setChoiceRoomId(roomId);
       setChoiceDate(date);
+      setChoiceTime(time);
       setIsChoiceOpen(true);
     } else {
       setSelectedBookingId(null);
       setInitialRoomId('');
       setInitialDate('');
+      setInitialTime('');
       setIsModalOpen(true);
     }
   };
@@ -229,51 +246,65 @@ export default function CalendarPage() {
           <p className="text-sm text-muted-foreground mt-1">Quản lý đặt phòng trực quan theo sơ đồ thời gian</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* View Mode Selector */}
-          <Select value={String(numDays)} onValueChange={(v) => setNumDays(Number(v))}>
-            <SelectTrigger className="w-28 h-8 text-xs bg-background border-border text-foreground">
-              <SelectValue placeholder="Số ngày" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">7 ngày</SelectItem>
-              <SelectItem value="14">14 ngày</SelectItem>
-              <SelectItem value="30">30 ngày</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Date Controls */}
-          <div className="flex items-center bg-background border border-border rounded-md p-0.5">
+          {/* View Mode Toggle */}
+          <div className="flex items-center bg-muted rounded-md p-0.5 border border-border">
             <Button
-              variant="ghost"
+              variant={viewMode === 'daily' ? 'default' : 'ghost'}
               size="sm"
-              onClick={handlePrevWeek}
-              className="h-7 px-2 hover:bg-muted text-muted-foreground hover:text-foreground"
+              onClick={() => setViewMode('daily')}
+              className={`h-7 px-3 text-xs font-medium ${viewMode === 'daily' ? 'shadow-sm' : 'text-muted-foreground'}`}
             >
-              <ChevronLeft className="h-4 w-4" />
+              Ngày
             </Button>
             <Button
-              variant="ghost"
+              variant={viewMode === 'hourly' ? 'default' : 'ghost'}
               size="sm"
-              onClick={handleToday}
-              className="h-7 px-3 hover:bg-muted text-foreground hover:text-foreground text-xs font-medium"
+              onClick={() => setViewMode('hourly')}
+              className={`h-7 px-3 text-xs font-medium ${viewMode === 'hourly' ? 'shadow-sm' : 'text-muted-foreground'}`}
             >
-              Hôm nay
-            </Button>
-            <Input 
-              type="date" 
-              value={formatDateForInput(startDate)} 
-              onChange={handleDateChange} 
-              className="h-7 w-[120px] px-2 text-xs bg-transparent border-none text-foreground focus-visible:ring-0 dark:[&::-webkit-calendar-picker-indicator]:invert"
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleNextWeek}
-              className="h-7 px-2 hover:bg-muted text-muted-foreground hover:text-foreground"
-            >
-              <ChevronRight className="h-4 w-4" />
+              Giờ
             </Button>
           </div>
+
+          {/* Conditional View Mode Selector / Date Controls */}
+          {viewMode === 'daily' ? (
+            <>
+              <Select value={String(numDays)} onValueChange={(v) => setNumDays(Number(v))}>
+                <SelectTrigger className="w-28 h-8 text-xs bg-background border-border text-foreground">
+                  <SelectValue placeholder="Số ngày" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 ngày</SelectItem>
+                  <SelectItem value="14">14 ngày</SelectItem>
+                  <SelectItem value="30">30 ngày</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="flex items-center bg-background border border-border rounded-md p-0.5">
+                <Button variant="ghost" size="sm" onClick={handlePrevWeek} className="h-7 px-2 hover:bg-muted text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="sm" onClick={handleToday} className="h-7 px-3 hover:bg-muted text-foreground hover:text-foreground text-xs font-medium">Hôm nay</Button>
+                <Input 
+                  type="date" 
+                  value={formatDateForInput(startDate)} 
+                  onChange={handleDateChange} 
+                  className="h-7 w-[120px] px-2 text-xs bg-transparent border-none text-foreground focus-visible:ring-0 dark:[&::-webkit-calendar-picker-indicator]:invert"
+                />
+                <Button variant="ghost" size="sm" onClick={handleNextWeek} className="h-7 px-2 hover:bg-muted text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center bg-background border border-border rounded-md p-0.5">
+              <Button variant="ghost" size="sm" onClick={() => { const d = new Date(hourlyDate); d.setDate(d.getDate() - 1); setHourlyDate(d); }} className="h-7 px-2 hover:bg-muted text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="sm" onClick={() => setHourlyDate(new Date())} className="h-7 px-3 hover:bg-muted text-foreground hover:text-foreground text-xs font-medium">Hôm nay</Button>
+              <Input 
+                type="date" 
+                value={formatDateForInput(hourlyDate)} 
+                onChange={(e) => { if(e.target.value) setHourlyDate(new Date(e.target.value)); }} 
+                className="h-7 w-[120px] px-2 text-xs bg-transparent border-none text-foreground focus-visible:ring-0 dark:[&::-webkit-calendar-picker-indicator]:invert"
+              />
+              <Button variant="ghost" size="sm" onClick={() => { const d = new Date(hourlyDate); d.setDate(d.getDate() + 1); setHourlyDate(d); }} className="h-7 px-2 hover:bg-muted text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></Button>
+            </div>
+          )}
           
           <Button
             variant="outline"
@@ -297,20 +328,24 @@ export default function CalendarPage() {
       </div>
 
       {/* Grid Timeline Scheduler */}
-      <Card className="border-border bg-card overflow-x-auto select-none rounded-xl">
+      <Card className="border-border bg-card overflow-x-auto select-none rounded-xl relative">
         <CardContent className="p-4 min-w-[900px]">
           {/* Grid Layout definition */}
           <div 
-            className="grid gap-y-[3px]"
+            className="grid gap-y-[3px] relative"
             style={{
-              gridTemplateColumns: `180px repeat(${numDays}, 1fr)`,
+              gridTemplateColumns: viewMode === 'daily' ? `180px repeat(${numDays}, 1fr)` : `180px repeat(24, 1fr)`,
             }}
           >
             {/* Header dates row */}
-            <div className="h-14 flex items-center pr-3 font-semibold text-xs text-muted-foreground border-b border-border">
-              Phòng / Ngày
+            <div 
+              className="h-14 flex items-center pr-3 font-semibold text-xs text-muted-foreground border-b border-border"
+              style={{ gridRow: 1, gridColumn: 1 }}
+            >
+              Phòng / {viewMode === 'daily' ? 'Ngày' : 'Giờ'}
             </div>
-            {daysArray.map((day, idx) => {
+            
+            {viewMode === 'daily' ? daysArray.map((day, idx) => {
               const isToday = isSameDay(day, new Date());
               return (
                 <div 
@@ -318,6 +353,7 @@ export default function CalendarPage() {
                   className={`h-14 flex flex-col items-center justify-center border-b border-border text-center font-mono ${
                     isToday ? 'bg-primary/5 text-primary font-bold border-x border-primary/10' : 'text-muted-foreground'
                   }`}
+                  style={{ gridRow: 1, gridColumn: idx + 2 }}
                 >
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground">
                     {day.toLocaleDateString('vi-VN', { weekday: 'short' })}
@@ -325,13 +361,47 @@ export default function CalendarPage() {
                   <span className="text-sm mt-0.5">{day.getDate()}</span>
                 </div>
               );
-            })}
+            }) : Array.from({ length: 24 }).map((_, idx) => (
+                <div 
+                  key={idx} 
+                  className={`h-14 flex flex-col items-center justify-center border-b border-border text-center font-mono text-muted-foreground`}
+                  style={{ gridRow: 1, gridColumn: idx + 2 }}
+                >
+                  <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                    {String(idx).padStart(2, '0')}:00
+                  </span>
+                </div>
+            ))}
+
+            {/* Current Time Indicator for Hourly View */}
+            {viewMode === 'hourly' && isSameDay(hourlyDate, new Date()) && (() => {
+              const currentHour = currentTime.getHours();
+              const currentMinute = currentTime.getMinutes();
+              const exactHour = currentHour + currentMinute / 60;
+              return (
+                <div style={{ gridColumn: '2 / span 24', gridRow: `1 / ${rooms.length === 0 ? 3 : displayRows.length + 2}`, pointerEvents: 'none', position: 'relative', zIndex: 20 }}>
+                  <div 
+                    className="absolute top-14 bottom-0 border-l-2 border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
+                    style={{ left: `${(exactHour / 24) * 100}%` }}
+                  >
+                    <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-red-500 rounded-full">
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 bg-red-500 text-white text-[9px] font-bold font-mono px-1 py-0.5 rounded shadow-[0_2px_5px_rgba(239,68,68,0.4)] whitespace-nowrap">
+                        {String(currentHour).padStart(2, '0')}:{String(currentMinute).padStart(2, '0')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Rooms Rows */}
             {rooms.length === 0 ? (
               <div 
                 className="py-12 text-center text-xs text-muted-foreground" 
-                style={{ gridColumn: `1 / span ${numDays + 1}` }}
+                style={{ 
+                  gridColumn: viewMode === 'daily' ? `1 / span ${numDays + 1}` : `1 / span 25`,
+                  gridRow: 2
+                }}
               >
                 Chưa có phòng nào được tạo ở chi nhánh này. Vui lòng thêm phòng trong phần Quản lý phòng.
               </div>
@@ -352,7 +422,13 @@ export default function CalendarPage() {
                       </div>
                       
                       {/* Empty cells for Header row */}
-                      {daysArray.map((day, colIdx) => (
+                      {viewMode === 'daily' ? daysArray.map((day, colIdx) => (
+                        <div 
+                          key={`empty-header-${rowIdx}-${colIdx}`}
+                          className="h-[42px] border-b border-r border-border bg-muted/30"
+                          style={{ gridColumn: colIdx + 2, gridRow: gridRow }}
+                        />
+                      )) : Array.from({ length: 24 }).map((_, colIdx) => (
                         <div 
                           key={`empty-header-${rowIdx}-${colIdx}`}
                           className="h-[42px] border-b border-r border-border bg-muted/30"
@@ -367,22 +443,32 @@ export default function CalendarPage() {
                 const room = row;
                 
                 // Find bookings that belong to this room and cross the active interval
-                const roomBookings = bookings.filter(b => 
-                  String(b.RoomId) === String(room.Id) &&
-                  b.Status !== 'Cancelled' &&
-                  b.Status !== 'NoShow' &&
-                  (isDateBetween(b.CheckInDate, startDate, endDate) ||
-                   isDateBetween(b.CheckOutDate, startDate, endDate) ||
-                   (new Date(b.CheckInDate) <= startDate && new Date(b.CheckOutDate) >= endDate))
-                );
+                const roomBookings = bookings.filter(b => {
+                  if (String(b.RoomId) !== String(room.Id) || b.Status === 'Cancelled' || b.Status === 'NoShow') return false;
+                  if (viewMode === 'daily') {
+                    return (isDateBetween(b.CheckInDate, startDate, endDate) ||
+                           isDateBetween(b.CheckOutDate, startDate, endDate) ||
+                           (new Date(b.CheckInDate) <= startDate && new Date(b.CheckOutDate) >= endDate));
+                  } else {
+                    return (isDateBetween(b.CheckInDate, hourlyDate, hourlyDate) ||
+                           isDateBetween(b.CheckOutDate, hourlyDate, hourlyDate) ||
+                           (new Date(b.CheckInDate) <= hourlyDate && new Date(b.CheckOutDate) >= hourlyDate));
+                  }
+                });
 
                 // Find room blocks that belong to this room and cross the active interval
-                const roomBlocksList = roomBlocks.filter(block => 
-                  String(block.RoomId) === String(room.Id) &&
-                  (isDateBetween(block.StartDate, startDate, endDate) ||
-                   isDateBetween(block.EndDate, startDate, endDate) ||
-                   (new Date(block.StartDate) <= startDate && new Date(block.EndDate) >= endDate))
-                );
+                const roomBlocksList = roomBlocks.filter(block => {
+                  if (String(block.RoomId) !== String(room.Id)) return false;
+                  if (viewMode === 'daily') {
+                    return (isDateBetween(block.StartDate, startDate, endDate) ||
+                           isDateBetween(block.EndDate, startDate, endDate) ||
+                           (new Date(block.StartDate) <= startDate && new Date(block.EndDate) >= endDate));
+                  } else {
+                    return (isDateBetween(block.StartDate, hourlyDate, hourlyDate) ||
+                           isDateBetween(block.EndDate, hourlyDate, hourlyDate) ||
+                           (new Date(block.StartDate) <= hourlyDate && new Date(block.EndDate) >= hourlyDate));
+                  }
+                });
 
                 return (
                   <React.Fragment key={room.Id}>
@@ -404,9 +490,9 @@ export default function CalendarPage() {
                       </div>
                     </div>
 
-                    {/* Day cells grid background */}
-                    {daysArray.map((day, colIdx) => {
-                      const dateStr = day.toISOString().split('T')[0];
+                    {/* Day/Hour cells grid background */}
+                    {viewMode === 'daily' ? daysArray.map((day, colIdx) => {
+                      const dateStr = formatDateForInput(day);
                       const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                       
                       // Check if this cell's date is blocked
@@ -437,23 +523,46 @@ export default function CalendarPage() {
                           )}
                         </div>
                       );
+                    }) : Array.from({ length: 24 }).map((_, colIdx) => {
+                      const dateStr = formatDateForInput(hourlyDate);
+                      const isCellBlocked = roomBlocksList.length > 0;
+                      const timeStr = `${String(colIdx).padStart(2, '0')}:00`;
+
+                      return (
+                        <div 
+                          key={colIdx}
+                          style={{ gridColumn: colIdx + 2, gridRow: gridRow }}
+                          onClick={isCellBlocked ? null : () => handleOpenNewBooking(room.Id, dateStr, timeStr)}
+                          className={`h-12 border-b border-r border-border/60 relative transition-all ${
+                            isCellBlocked 
+                              ? 'cursor-not-allowed bg-rose-500/10' 
+                              : `cursor-pointer hover:bg-muted/60 group/cell`
+                          }`}
+                        >
+                          {!isCellBlocked && (
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity pointer-events-none">
+                              <Plus className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                      );
                     })}
 
                     {/* Render Room Blocks Overlay Card */}
                     {roomBlocksList.map((block) => {
-                      const start = new Date(block.StartDate);
-                      const end = new Date(block.EndDate);
+                      let startCol = 2;
+                      let colSpan = viewMode === 'daily' ? numDays : 24;
 
-                      let startCol = getDayDiff(start, startDate);
-                      let endCol = getDayDiff(end, startDate);
-
-                      const isLeftOut = startCol < 0;
-                      const isRightOut = endCol > numDays;
-
-                      startCol = Math.max(0, startCol) + 2; 
-                      endCol = Math.min(numDays, endCol) + 2; 
-
-                      const colSpan = Math.max(1, endCol - startCol + 1);
+                      if (viewMode === 'daily') {
+                        const start = new Date(block.StartDate);
+                        const end = new Date(block.EndDate);
+                        let diffStart = getDayDiff(start, startDate);
+                        let diffEnd = getDayDiff(end, startDate);
+                        diffStart = Math.max(0, diffStart) + 2; 
+                        diffEnd = Math.min(numDays, diffEnd) + 2; 
+                        startCol = diffStart;
+                        colSpan = Math.max(1, diffEnd - diffStart + 1);
+                      }
 
                       return (
                         <div
@@ -479,23 +588,51 @@ export default function CalendarPage() {
 
                     {/* Render Booking Span Overlay Card */}
                     {roomBookings.map((b) => {
+                      let startCol = 2;
+                      let colSpan = 1;
+                      let isLeftOut = false;
+                      let isRightOut = false;
+                      
                       const checkIn = new Date(b.CheckInDate);
                       const checkOut = new Date(b.CheckOutDate);
 
-                      // Calculate grid columns span
-                      // Grid starts at column 2 (day 0) and ends at column 16 (day 13)
-                      let startCol = getDayDiff(checkIn, startDate);
-                      let endCol = getDayDiff(checkOut, startDate);
+                      if (viewMode === 'daily') {
+                        let diffStart = getDayDiff(checkIn, startDate);
+                        let diffEnd = getDayDiff(checkOut, startDate);
 
-                      // Clamp values to fit active grid viewport [0, 14]
-                      const isLeftOut = startCol < 0;
-                      const isRightOut = endCol > numDays;
+                        isLeftOut = diffStart < 0;
+                        isRightOut = diffEnd > numDays;
 
-                      startCol = Math.max(0, startCol) + 2; 
-                      endCol = Math.min(numDays, endCol) + 2; 
+                        diffStart = Math.max(0, diffStart) + 2; 
+                        diffEnd = Math.min(numDays, diffEnd) + 2; 
+                        startCol = diffStart;
+                        colSpan = Math.max(1, diffEnd - diffStart);
+                      } else {
+                        // Hourly View Mode
+                        let startHour = 0;
+                        let endHour = 24;
 
-                      // Span must be at least 1
-                      const colSpan = Math.max(1, endCol - startCol);
+                        if (isSameDay(checkIn, hourlyDate)) {
+                          const timeParts = (b.CheckInTime || '14:00').split(':');
+                          startHour = parseInt(timeParts[0]) + parseInt(timeParts[1]) / 60;
+                        } else if (checkIn < hourlyDate) {
+                          startHour = 0;
+                          isLeftOut = true;
+                        }
+
+                        if (isSameDay(checkOut, hourlyDate)) {
+                          const timeParts = (b.CheckOutTime || '12:00').split(':');
+                          endHour = parseInt(timeParts[0]) + parseInt(timeParts[1]) / 60;
+                        } else if (checkOut > hourlyDate) {
+                          endHour = 24;
+                          isRightOut = true;
+                        }
+
+                        const colStartInt = Math.floor(startHour);
+                        const colEndInt = Math.ceil(endHour);
+                        startCol = colStartInt + 2;
+                        colSpan = Math.max(1, colEndInt - colStartInt);
+                      }
 
                       return (
                         <div
@@ -515,11 +652,11 @@ export default function CalendarPage() {
                             <div className="grid grid-cols-2 gap-2 text-xs mb-2 bg-muted/60 p-2 rounded-lg">
                               <div>
                                 <div className="text-[9px] text-muted-foreground uppercase">IN</div>
-                                <div className="text-foreground font-semibold">{checkIn.getDate()}/{checkIn.getMonth() + 1}</div>
+                                <div className="text-foreground font-semibold">{checkIn.getDate()}/{checkIn.getMonth() + 1} {b.CheckInTime && b.BookingType === 'Hourly' ? b.CheckInTime : ''}</div>
                               </div>
                               <div>
                                 <div className="text-[9px] text-muted-foreground uppercase">OUT</div>
-                                <div className="text-foreground font-semibold">{checkOut.getDate()}/{checkOut.getMonth() + 1}</div>
+                                <div className="text-foreground font-semibold">{checkOut.getDate()}/{checkOut.getMonth() + 1} {b.CheckOutTime && b.BookingType === 'Hourly' ? b.CheckOutTime : ''}</div>
                               </div>
                             </div>
 
@@ -586,6 +723,7 @@ export default function CalendarPage() {
         bookingId={selectedBookingId}
         initialRoomId={initialRoomId}
         initialDate={initialDate}
+        initialTime={initialTime}
         onSave={fetchCalendarData}
       />
 
@@ -603,6 +741,7 @@ export default function CalendarPage() {
                 setSelectedBookingId(null);
                 setInitialRoomId(choiceRoomId);
                 setInitialDate(choiceDate);
+                setInitialTime(choiceTime);
                 setIsModalOpen(true);
               }}
             >

@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request) {
   try {
     const data = await request.json();
-    const { Code, RoomType, Nights } = data;
+    const { Code, RoomType, Nights, BookingType } = data;
 
     if (!Code) {
       return NextResponse.json({ error: 'Mã khuyến mãi là bắt buộc.' }, { status: 400 });
@@ -35,6 +35,19 @@ export async function POST(request) {
 
     if (promo.UsageLimit && promo.UsageLimit > 0 && promo.UsedCount >= promo.UsageLimit) {
       return NextResponse.json({ error: 'Mã khuyến mãi đã hết lượt sử dụng.' }, { status: 400 });
+    }
+
+    // Validate BookingType
+    if (BookingType) {
+      const allowedBookingTypesStr = promo.BookingTypes || 'Daily';
+      const allowedBookingTypes = allowedBookingTypesStr.split(',').map(t => t.trim().toLowerCase());
+      if (!allowedBookingTypes.includes(BookingType.toLowerCase())) {
+        let label = 'này';
+        if (BookingType === 'Hourly') label = 'theo giờ (Hourly)';
+        else if (BookingType === 'Overnight') label = 'qua đêm (Overnight)';
+        else if (BookingType === 'Daily') label = 'theo ngày (Daily)';
+        return NextResponse.json({ error: `Mã khuyến mãi không áp dụng cho hình thức đặt phòng ${label}.` }, { status: 400 });
+      }
     }
 
     if (promo.MinNights && Nights < promo.MinNights) {
